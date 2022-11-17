@@ -68,6 +68,14 @@ mod tests {
     }
 
     #[test]
+    fn vec_sub() {
+        assert_eq!(
+            Vec2::new(2, 2) - Vec2::new(-1, 1),
+            Vec2::new(3, 1)
+        )
+    }
+
+    #[test]
     fn vec_up() {
         let v = Vec2::new(2, 2);
         assert_eq!(v.up(), v + UP)
@@ -77,5 +85,17 @@ mod tests {
     fn vec_down() {
         let v = Vec2::new(2, 2);
         assert_eq!(v.down(), v + DOWN)
+    }
+
+    #[test]
+    fn vec_left() {
+        let v = Vec2::new(2, 2);
+        assert_eq!(v.left(), v + LEFT)
+    }
+
+    #[test]
+    fn vec_right() {
+        let v = Vec2::new(2, 2);
+        assert_eq!(v.right(), v + RIGHT)
     }
 }

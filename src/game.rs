@@ -36,11 +36,11 @@ impl Player {
         }
     }
 
-    fn set_stones(&mut self, n: i32) {
+    pub fn set_stones(&mut self, n: i32) {
         self.stones = n
     }
 
-    fn get_stone(&mut self) -> Option<Stone> {
+    pub fn get_stone(&mut self) -> Option<Stone> {
         if self.stones <= 0 {
             None
         } else {
@@ -71,4 +71,24 @@ impl Stone {
     pub fn new(o: i32) -> Stone {
         Stone { owner: o }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn player_get_stone() {
+        let mut player = Player::new(1, 1);
+        match player.get_stone() {
+            None => panic!("Expecting to get a stone!"),
+            Some(stone) => assert_eq!(stone.owner, 1)
+        } 
+        assert_eq!(player.stones, 0);
+        match player.get_stone() {
+            None => (),
+            Some(_) => panic!("Expecting to not get a stone!")
+        }
+    }
+
 }

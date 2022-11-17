@@ -108,11 +108,11 @@ impl Board {
         for yi in 0 .. BOARD_HEIGHT as i32 * 2 + 1 {
             let turn = yi % 2;
             for xi in 0 .. BOARD_WIDTH as i32 * 2 + 1 {
-                if (xi % 2 == turn) {
+                if xi % 2 == turn {
                     continue;
                 }
                 let idx = Board::vec_to_stone_idx(Vec2::new(xi >> 2, yi >> 2)); 
-                if (turn == 0) {
+                if turn == 0 {
                     // print row of stones
                     let stone = self.stone_board[idx];
                     
@@ -123,7 +123,7 @@ impl Board {
                         draw_char = PLAYER_B_STONE;
                     }
                     print!("{} ", draw_char);
-                } else if (turn == 1) {
+                } else if turn == 1 {
                     let checker = self.checker_board[idx];
                     
                     let mut draw_char: char = ' ';
