@@ -48,18 +48,14 @@ impl Player {
         }
     }
 }
-const PLAYER_A_LOW_CHECK: char = '░';
-const PLAYER_A_MID_CHECK: char = '▒';
-const PLAYER_A_HIGH_CHECK: char = '▓';
+const PLAYER_A_CHECK: [char; 4] = [' ', '░', '▒', '▓'];
 const PLAYER_A_STONE: char = 'a';
 
-const PLAYER_B_LOW_CHECK: char = '▁';
-const PLAYER_B_MID_CHECK: char = '▃';
-const PLAYER_B_HIGH_CHECK: char = '▇';
+const PLAYER_B_CHECK: [char; 4] = [' ', '▁', '▃', '▇'];
 const PLAYER_B_STONE: char = 'b';
 
-const BOARD_WIDTH: usize = 6;
-const BOARD_HEIGHT: usize = 8;
+const BOARD_WIDTH: usize = 8;
+const BOARD_HEIGHT: usize = 6;
 
 struct Board {
     checker_board: [Checker; BOARD_WIDTH * BOARD_HEIGHT],
@@ -156,6 +152,38 @@ impl Board {
     }
 
     fn print(&self) {
+        for yi in 0 .. BOARD_HEIGHT as i32 * 2 + 1 {
+            let turn = yi % 2;
+            for xi in 0 .. BOARD_WIDTH as i32 * 2 + 1 {
+                if (xi % 2 == turn) {
+                    continue;
+                }
+                let idx = Board::vec_to_stone_idx(Vec2::new(xi >> 2, yi >> 2)); 
+                if (turn == 0) {
+                    // print row of stones
+                    let stone = self.stone_board[idx];
+                    
+                    let mut draw_char: char = ' ';
+                    if stone.owner == PLAYER_A_ID {
+                        draw_char = PLAYER_A_STONE;
+                    } else if stone.owner == PLAYER_B_ID {
+                        draw_char = PLAYER_B_STONE;
+                    }
+                    print!("{} ", draw_char);
+                } else if (turn == 1) {
+                    let checker = self.checker_board[idx];
+                    
+                    let mut draw_char: char = ' ';
+                    if checker.owner == PLAYER_A_ID {
+                        draw_char = PLAYER_A_CHECK[checker.height as usize];
+                    } else if checker.owner == PLAYER_B_ID {
+                        draw_char = PLAYER_B_CHECK[checker.height as usize];
+                    }
+                    print!("{} ", draw_char);
+                }
+            } 
+            print!("\n")
+        }
     }
 
 }
