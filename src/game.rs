@@ -50,7 +50,7 @@ impl Player {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Checker {
     pub height: i32,
     pub owner: i32
