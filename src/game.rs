@@ -62,7 +62,7 @@ impl Checker {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stone {
     pub owner: i32
 }

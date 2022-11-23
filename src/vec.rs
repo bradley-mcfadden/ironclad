@@ -1,10 +1,10 @@
 
 use std::ops::{Add, Sub};
 
-const UP: Vec2 = Vec2 { x: 0, y: -1 };
-const DOWN: Vec2 = Vec2 { x: 0, y: 1 };
-const LEFT: Vec2 = Vec2 { x: -1, y: 0 };
-const RIGHT: Vec2 = Vec2 { x: 1, y: 0 };
+pub const UP: Vec2 = Vec2 { x: 0, y: -1 };
+pub const DOWN: Vec2 = Vec2 { x: 0, y: 1 };
+pub const LEFT: Vec2 = Vec2 { x: -1, y: 0 };
+pub const RIGHT: Vec2 = Vec2 { x: 1, y: 0 };
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vec2 {
