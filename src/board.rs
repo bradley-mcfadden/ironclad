@@ -380,6 +380,8 @@ impl Board {
 
 #[cfg(test)]
 mod tests {
+    use std::io::empty;
+
     use super::*;
     use crate::game::Checker;
 
@@ -401,6 +403,19 @@ mod tests {
     #[test]
     fn check_initial_board() {
         let board = Board::new();
+        check_start_state(&board)
+    }
+
+    #[test]
+    fn reset() {
+        let mut board = Board::new();
+        board.place_stone_at(Vec2::new(0, 0), Stone::new(PLAYER_A_ID)).unwrap();
+        board.place_checker_at(Vec2::new(4, 4), Checker::new(2, PLAYER_A_ID)).unwrap();
+        board.reset();
+        check_start_state(&board)
+    }
+
+    fn check_start_state(board: &Board) {
         // Board should be free of stones
         for x in 0..BOARD_WIDTH {
             for y in 0..BOARD_HEIGHT {
@@ -410,6 +425,7 @@ mod tests {
                 assert_eq!(stone.unwrap().owner, EMPTY_PLAYER_ID)
             }
         }
+        let empty_c = Checker::new(0, EMPTY_PLAYER_ID);
         // On the checkerboard,
         // [0, 1] and [0, 4] should have 2-stack player B pieces
         let b2 = Checker::new(2, PLAYER_B_ID);
@@ -434,7 +450,32 @@ mod tests {
         // [6, 2] and [6, 3] should have 1-stack player A pieces
         let a1 = Checker::new(1, PLAYER_A_ID);
         assert_eq!(*board.checker_at(Vec2::new(6, 2)).unwrap(), a1);
-        assert_eq!(*board.checker_at(Vec2::new(6, 3)).unwrap(), a1);           
+        assert_eq!(*board.checker_at(Vec2::new(6, 3)).unwrap(), a1);   
+        
+        // Row 0 should be empty
+        for xoff in 0..8 {
+            assert_eq!(*board.checker_at(Vec2::new(xoff, 0)).unwrap(), empty_c);
+        }
+        // 1,1 to 6,1 should be empty
+        for xoff in 1..7 {
+            assert_eq!(*board.checker_at(Vec2::new(xoff, 1)).unwrap(), empty_c);
+        }
+        // 2,2 to 5,2 should be empty
+        for xoff in 2..6 {
+            assert_eq!(*board.checker_at(Vec2::new(xoff, 2)).unwrap(), empty_c);
+        }
+        // 2,3 to 5,3 should be empty
+        for xoff in 2..6 {
+            assert_eq!(*board.checker_at(Vec2::new(xoff, 3)).unwrap(), empty_c);
+        }
+        // 1,4 to 6,4 should be empty
+        for xoff in 1..7 {
+            assert_eq!(*board.checker_at(Vec2::new(xoff, 4)).unwrap(), empty_c);
+        }
+        // Row 5 should be empty
+        for xoff in 0..8 {
+            assert_eq!(*board.checker_at(Vec2::new(xoff, 5)).unwrap(), empty_c);
+        }
     }
 
     #[test]
