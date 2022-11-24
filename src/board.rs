@@ -24,8 +24,6 @@ pub enum MoveError {
 }
 
 pub enum FireError {
-    // There is no unit on the attacked square
-    EmptyError,
     // Move was out not a valid board index
     IndexError,
     // No attacker pieces are in range
@@ -34,7 +32,9 @@ pub enum FireError {
 
 pub enum SlideError {
     // Thrown when move index is out of bounds.
+    IndexError,
     // Thrown when slide is blocked
+    BlockedError
 }
 
 pub enum Direction {
@@ -71,22 +71,22 @@ pub struct Board {
 }
 
 impl Board {
+    /**
+     * new creates a new Board in its initial state.
+     * @ret New board, in Ironclad's start state.
+     */
     pub fn new() -> Board {
         let mut board = Board {
             checker_board: [Checker{height: 0, owner: EMPTY_PLAYER_ID}; BOARD_WIDTH * BOARD_HEIGHT],
             stone_board: [Stone{owner: EMPTY_PLAYER_ID}; (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)] 
         };
         board.place_start_pieces();
-        
         board
     }
 
-    // TODO:
-    // function that returns stones for player
-    // function that returns checkers for a player
-    // function that returns valid stone placement squares
-
-
+    /**
+     * reset the board to the game's initial state.
+     */
     pub fn reset(&mut self) {
         self.clear_board();
         self.place_start_pieces()
@@ -113,10 +113,23 @@ impl Board {
         self.stone_board.fill(Stone::new(EMPTY_PLAYER_ID))
     }
 
-    pub fn can_move_checker(&self, from: Vec2, to: Vec2) -> bool {
-        true
+    /**
+     * move_checker from @from to @to, returning Ok if the move is accepted, and an error otherwise.
+     * @from Position of checker to move.
+     * @to Position to move checker to.
+     * @ret Ok if move is legal, or a MoveError if something went wrong.
+     */
+    pub fn move_checker(&self, from: Vec2, to: Vec2) -> Result<(), MoveError> {
+        Ok(())
     }
 
+    /**
+     * slide_stone
+     * Slide a stone in a Direction as many squares as possible.
+     * @from Position of stone to slide.
+     * @dir Direction to move stone in.
+     * @ret Ok if slide is legal, or SlideError if something went wrong.
+     */
     pub fn slide_stone(&self, from: Vec2, dir: Direction) -> Result<(), SlideError> {
         Ok(())
     }
@@ -171,6 +184,7 @@ impl Board {
     }
 
     /**
+     * TODO: test me
      * checker_neighbours_of_stone
      * Returns a list of all valid checker neighbours of the stone at @pos.
      * Since stones surround check squares, for a vector pos, the possible
@@ -196,6 +210,7 @@ impl Board {
     }
 
     /**
+     * TODO: Test me
      * stone_neighbours_of_checker
      * Returns a list of all valid stone neighbours of the checker at @pos.
      * Since stones surround check squares, for a vector pos, the possible
@@ -220,6 +235,7 @@ impl Board {
     }
 
     /**
+     * TODO: Test me
      * checker_neighbours
      * Given the checker position @pos, return up to 8 neighbours of the square.
      */
@@ -243,7 +259,7 @@ impl Board {
 
     /**
      * fire_checker_at
-     * @player attacks the checker at @pos, with all possible pieces in range, or errors.
+     * Player of id @player attacks the checker at @pos, with all possible pieces in range, or errors.
      * @player Player id 
      * @pos Square to attempt to attack.
      * @return Ok if no error, or one of the error types if something went wrong.
@@ -251,13 +267,11 @@ impl Board {
     pub fn fire_checker_at(&self, player: i32, pos: Vec2) -> Result<(), FireError> {
         Ok(())
     }
-
-    // pub fn can_fire_at(&self, from: Vec2, pos: Vec2) -> bool {
-    //     true
-    // }
-
-    /*
-     * Do a bounds check and return an Option
+    
+    /**
+     * checker_at returns the Checker on the board at the provided position or an error.
+     * @pos Vec2 instance that should be between [0, 0] and [BOARD_WIDTH - 1, BOARD_HEIGHT - 1].
+     * @ret Ok containing the Checker, or an Err if position is not a valid checker index.
      */
     pub fn checker_at<'a>(&'a self, pos: Vec2) -> Result<&'a Checker, ()> {
         if !Board::is_checker_vec_valid(pos) {
@@ -268,8 +282,11 @@ impl Board {
         }
     }
 
-    /*
-     * Bounds check and return an Option
+    /**
+     * stone_at returns the Stone on the board at the provided position, or an error
+     * if the position was not in range.
+     * @pos Vec2 instance that should be between [0, 0] and [BOARD_WIDTH, BOARD_HEIGHT] inclusive.
+     * @ret Ok containing the stone, or an Err if position is not a valid stone index. 
      */
     pub fn stone_at<'a>(&'a self, pos: Vec2) -> Result<&'a Stone, ()> {
         if !Board::is_stone_vec_valid(pos) {
@@ -330,16 +347,54 @@ impl Board {
         x + y * BOARD_WIDTH
     }
 
-    pub fn stones_for_player(player: i32) -> Vec<Vec2> {
-        Vec::new()
+    /**
+     * TODO: Test me
+     * stones_for_player returns the positions of all stones belonging
+     * to @player.
+     * @player Player id to match against stone.owner.
+     * @ret Vec containing positions of stones owned by player.
+     */
+    pub fn stones_for_player(&self, player: i32) -> Vec<Vec2> {
+        let mut stones: Vec<Vec2> = Vec::new();
+        for x in 0 ..=BOARD_WIDTH {
+            for y in 0..=BOARD_HEIGHT {
+                let pos = Vec2::new(x as i32, y as i32);
+                if self.stone_at_unsafe(pos).owner == player {
+                    stones.push(pos);
+                } 
+            }
+        }
+        stones
     }
 
-    pub fn checkers_for_player(player: i32) -> Vec<Vec2> {
-        Vec::new()
+    /**
+     * TODO: Test me
+     * checkers_for_player returns the positions of all checkers belonging
+     * to @player.
+     * @player Player ID to match against checker.owner.
+     * @ret Vec containing positions of checkers owned by player.
+     */
+    pub fn checkers_for_player(&self, player: i32) -> Vec<Vec2> {
+        let mut checkers: Vec<Vec2> = Vec::new();
+        for x in 0 .. BOARD_WIDTH {
+            for y in 0 .. BOARD_HEIGHT {
+                let pos = Vec2::new(x as i32, y as i32);
+                if self.checker_at_unsafe(pos).owner == player {
+                    checkers.push(pos);
+                } 
+            }
+        }
+        checkers
     }
 
-    pub fn empty_stones() -> Vec<Vec2> {
-        Vec::new()
+    /**
+     * TODO: Test me
+     * empty_stones returns all possible stone positions that do not contain 
+     * a stone.
+     * @ret Vec containing positions on stone board not containing a stone.
+     */
+    pub fn empty_stones(&self) -> Vec<Vec2> {
+        self.stones_for_player(EMPTY_PLAYER_ID)
     }
 
     pub fn print(&self) {
@@ -373,15 +428,13 @@ impl Board {
                     print!("{} ", draw_char);
                 }
             } 
-            print!("\n")
+            println!()
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::io::empty;
-
     use super::*;
     use crate::game::Checker;
 
