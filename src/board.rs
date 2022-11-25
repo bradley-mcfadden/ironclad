@@ -38,19 +38,19 @@ pub enum SlideError {
 }
 
 pub enum Direction {
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT
+    Up,
+    Down,
+    Left,
+    Right
 }
 
 impl Direction {
     pub fn as_vec(&self) -> Vec2 {
         match self {
-            UP => crate::vec::UP,
-            DOWN => crate::vec::DOWN,
-            LEFT => crate::vec::LEFT,
-            RIGHT => crate::vec::RIGHT
+            Direction::Up => crate::vec::UP,
+            Direction::Down => crate::vec::DOWN,
+            Direction::Left => crate::vec::LEFT,
+            Direction::Right => crate::vec::RIGHT
         }
     }
 }
@@ -114,6 +114,7 @@ impl Board {
     }
 
     /**
+     * TODO: Implement me and test
      * move_checker from @from to @to, returning Ok if the move is accepted, and an error otherwise.
      * @from Position of checker to move.
      * @to Position to move checker to.
@@ -124,6 +125,7 @@ impl Board {
     }
 
     /**
+     * TODO: Implement me and test
      * slide_stone
      * Slide a stone in a Direction as many squares as possible.
      * @from Position of stone to slide.
@@ -131,6 +133,18 @@ impl Board {
      * @ret Ok if slide is legal, or SlideError if something went wrong.
      */
     pub fn slide_stone(&self, from: Vec2, dir: Direction) -> Result<(), SlideError> {
+        Ok(())
+    }
+
+    /**
+     * TODO: Implement me and test
+     * fire_checker_at
+     * Player of id @player attacks the checker at @pos, with all possible pieces in range, or errors.
+     * @player Player id 
+     * @pos Square to attempt to attack.
+     * @return Ok if no error, or one of the error types if something went wrong.
+     */
+    pub fn fire_checker_at(&self, player: i32, pos: Vec2) -> Result<(), FireError> {
         Ok(())
     }
 
@@ -155,13 +169,15 @@ impl Board {
             return Err(MoveError::OccupiedError);
         }
         self.checker_board[idx] = checker;
-        return Ok(())
+        Ok(())
     }
 
-    // pub fn can_move_stone(&self, from: Vec2, to: Vec2) -> bool {
-    //     true
-    // }
-
+    /**
+     * place_stone_at places a stone at a position, or returns a MoveError if a rule is broken.
+     * @pos - Position to place the checker at, should be within [0, 0], [BOARD_WIDTH+1, BOARD_HEIGHT+1]
+     * @stone - Stone to put at the position.
+     * @return - Ok if checker was placed, or one of the MoveError types if the stone was not placed.
+     */
     pub fn place_stone_at(&mut self, pos: Vec2, stone: Stone) -> Result<(), MoveError> {
         if !Board::is_stone_vec_valid(pos) {
             return Err(MoveError::IndexError(String::from("{pos} not within 0,0 and {BOARD_WIDTH},{BOARD_HEIGHT}")))  
@@ -180,11 +196,10 @@ impl Board {
         } 
 
         self.stone_board[idx] = stone;
-        return Ok(())
+        Ok(())
     }
 
     /**
-     * TODO: test me
      * checker_neighbours_of_stone
      * Returns a list of all valid checker neighbours of the stone at @pos.
      * Since stones surround check squares, for a vector pos, the possible
@@ -210,7 +225,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * stone_neighbours_of_checker
      * Returns a list of all valid stone neighbours of the checker at @pos.
      * Since stones surround check squares, for a vector pos, the possible
@@ -235,7 +249,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * checker_neighbours
      * Given the checker position @pos, return up to 8 neighbours of the square.
      */
@@ -254,18 +267,7 @@ impl Board {
                 out.push(*pos)
             }
         }
-        return out
-    }
-
-    /**
-     * fire_checker_at
-     * Player of id @player attacks the checker at @pos, with all possible pieces in range, or errors.
-     * @player Player id 
-     * @pos Square to attempt to attack.
-     * @return Ok if no error, or one of the error types if something went wrong.
-     */
-    pub fn fire_checker_at(&self, player: i32, pos: Vec2) -> Result<(), FireError> {
-        Ok(())
+        out
     }
     
     /**
@@ -325,7 +327,7 @@ impl Board {
             return false;
         }
         let idx = Board::vec_to_checker_idx(pos);
-        return idx < BOARD_WIDTH * BOARD_HEIGHT
+        idx < BOARD_WIDTH * BOARD_HEIGHT
     }
 
     fn is_stone_vec_valid(pos: Vec2) -> bool {
@@ -333,7 +335,7 @@ impl Board {
             return false;
         }
         let idx = Board::vec_to_stone_idx(pos);
-        return idx < (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)
+        idx < (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)
     }
 
     /**
@@ -368,7 +370,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * checkers_for_player returns the positions of all checkers belonging
      * to @player.
      * @player Player ID to match against checker.owner.
@@ -388,7 +389,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * empty_stones returns all possible stone positions that do not contain 
      * a stone.
      * @ret Vec containing positions on stone board not containing a stone.
@@ -584,4 +584,152 @@ mod tests {
 
     }
     
+    #[test]
+    fn checker_neighbours_of_stone() {
+        let neighbours = Board::checker_neigbours_of_stone(Vec2::new(1, 1));
+        assert!(neighbours.contains(&Vec2::new(0, 0)));
+        assert!(neighbours.contains(&Vec2::new(0, 1)));
+        assert!(neighbours.contains(&Vec2::new(1, 0)));
+        assert!(neighbours.contains(&Vec2::new(1, 1)));
+
+        // Top left corner
+        let nw_neighbours = Board::checker_neigbours_of_stone(Vec2::new(0, 0));
+        assert!(nw_neighbours.contains(&Vec2::new(0, 0)));
+
+        let ne_neighbours = Board::checker_neigbours_of_stone(Vec2::new(BOARD_WIDTH as i32, 0));
+        assert!(ne_neighbours.contains(&Vec2::new((BOARD_WIDTH - 1) as i32, 0)));
+
+        let sw_neighbours = Board::checker_neigbours_of_stone(Vec2::new(0, BOARD_HEIGHT as i32));
+        assert!(sw_neighbours.contains(&Vec2::new(0, (BOARD_HEIGHT - 1) as i32)));
+
+        let se_neighbours = Board::checker_neigbours_of_stone(Vec2::new(BOARD_WIDTH as i32, BOARD_HEIGHT as i32));
+        assert!(se_neighbours.contains(&Vec2::new((BOARD_WIDTH - 1) as i32, (BOARD_HEIGHT - 1) as i32)));
+
+        // Edge
+        let edge_neighbours = Board::checker_neigbours_of_stone(Vec2::new(0, 3));
+        assert!(edge_neighbours.contains(&Vec2::new(0, 2)));
+        assert!(edge_neighbours.contains(&Vec2::new(0, 3)));
+    }
+
+    #[test]
+    fn stone_neighbours_of_checker() {
+        let normal = Board::stone_neighbours_of_checker(Vec2::new(1, 1));
+        assert!(normal.contains(&Vec2::new(1, 1)));
+        assert!(normal.contains(&Vec2::new(1, 2)));
+        assert!(normal.contains(&Vec2::new(2, 1)));
+        assert!(normal.contains(&Vec2::new(2, 2)));
+
+        // lower right corner
+        let se_neighbours = Board::stone_neighbours_of_checker(Vec2::new((BOARD_WIDTH - 1) as i32, (BOARD_HEIGHT - 1) as i32));
+        assert!(se_neighbours.contains(&Vec2::new((BOARD_WIDTH - 1) as i32, (BOARD_HEIGHT - 1) as i32)));
+        assert!(se_neighbours.contains(&Vec2::new(BOARD_WIDTH as i32, (BOARD_HEIGHT - 1) as i32)));
+        assert!(se_neighbours.contains(&Vec2::new((BOARD_WIDTH - 1) as i32, BOARD_HEIGHT as i32)));
+        assert!(se_neighbours.contains(&Vec2::new(BOARD_WIDTH as i32, BOARD_HEIGHT as i32)));
+    }
+
+    #[test]
+    fn checker_neighbours() {
+        // Case 1: Middle of board, 8 neighbours
+        let mid_v = Vec2::new(3, 3);
+        let middle = Board::checker_neighbours(mid_v);
+        assert!(middle.contains(&mid_v.left()));
+        assert!(middle.contains(&mid_v.right()));
+        assert!(middle.contains(&mid_v.left().up()));
+        assert!(middle.contains(&mid_v.left().down()));
+        assert!(middle.contains(&mid_v.right().up()));
+        assert!(middle.contains(&mid_v.right().down()));
+        assert!(middle.contains(&mid_v.up()));
+        assert!(middle.contains(&mid_v.down()));
+        // Case 2: Corner, 3 neighbours
+        let cor_v = Vec2::new(0, 0);
+        let corner = Board::checker_neighbours(cor_v);
+        assert!(corner.contains(&cor_v.down()));
+        assert!(corner.contains(&cor_v.right()));
+        assert!(corner.contains(&cor_v.down().right()));
+        // Case 3: Edge, 5 neighbours
+        let edge_v = Vec2::new(0, 3);
+        let edge = Board::checker_neighbours(edge_v);
+        assert!(edge.contains(&edge_v.down()));
+        assert!(edge.contains(&edge_v.down().right()));
+        assert!(edge.contains(&edge_v.right()));
+        assert!(edge.contains(&edge_v.up()));
+        assert!(edge.contains(&edge_v.up().right()));
+    }
+
+    #[test]
+    fn stones_for_player() {
+        // Create board, place some stones, verify that list contains all placed stones
+        let mut board = Board::new();
+        let positions = vec![Vec2::new(0, 0), Vec2::new(5, 5), Vec2::new(4, 2)];
+        for pos in positions.iter() {
+            board.place_stone_at(*pos, Stone::new(PLAYER_A_ID)).unwrap();
+        }
+        let stones = board.stones_for_player(PLAYER_A_ID);
+        for pos in positions.iter() {
+            assert!(stones.contains(pos))
+        }
+        assert!(stones.len() == positions.len())
+    }
+
+    #[test]
+    fn checkers_for_player() {
+        let board = Board::new();
+        let checkers_a = board.checkers_for_player(PLAYER_A_ID);
+        let positions = vec![
+            Vec2::new(0, 1), Vec2::new(0, 2), Vec2::new(0, 3), 
+            Vec2::new(0, 4), Vec2::new(1, 2), Vec2::new(1, 3)
+        ];
+        for pos in positions.iter() {
+            assert!(checkers_a.contains(pos));
+        }
+        assert!(positions.len() == checkers_a.len())
+    }
+
+    #[test]
+    fn empty_stones() {
+        let board = Board::new();
+        let stones = board.empty_stones();
+        
+        assert!(stones.len() == (BOARD_HEIGHT + 1) * (BOARD_WIDTH + 1));
+        for x in 0..=BOARD_WIDTH as i32 {
+            for y in 0..=BOARD_HEIGHT as i32 {
+                let pos = Vec2::new(x, y);
+                assert!(stones.contains(&pos));
+            }
+        }
+    }
+
+    #[test]
+    fn slide_stone() {
+        let mut board = Board::new();
+        match board.slide_stone(Vec2::new(-1, -1), Direction::Up) {
+            Err(SlideError::IndexError) => (),
+            Err(SlideError::BlockedError) => panic!("Expected an IndexError, got a BlockedError"),
+            Ok(_) => panic!("Expected an IndexError, got no error")
+        }
+
+        board.place_stone_at(Vec2::new(2, 2), Stone::new(PLAYER_B_ID)).unwrap();
+        board.place_stone_at(Vec2::new(4, 2), Stone::new(PLAYER_B_ID)).unwrap();
+        board.place_stone_at(Vec2::new(3, 1), Stone::new(PLAYER_B_ID)).unwrap();
+        board.place_stone_at(Vec2::new(3, 3), Stone::new(PLAYER_B_ID)).unwrap();
+        board.place_stone_at(Vec2::new(3, 2), Stone::new(PLAYER_A_ID)).unwrap();
+        match board.slide_stone(Vec2::new(3, 2), Direction::Up) {
+            Err(SlideError::BlockedError) => (),
+            Err(SlideError::IndexError) => panic!("Expected a BlockedError, got an IndexError"),
+            Ok(_) => panic!("Expected a BlockedError, got an IndexError")
+        }
+
+        // TODO: Normal case -- does it stop when hitting the edge of the board?
+        // TODO: Normal case -- does it stop when hitting another stone?
+    }
+
+    #[test]
+    fn fire_checker_at() {
+
+    }
+
+    #[test]
+    fn move_checker() {
+
+    }
 }
