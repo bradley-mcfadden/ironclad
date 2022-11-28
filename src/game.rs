@@ -52,12 +52,12 @@ impl Player {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Checker {
-    pub height: i32,
+    pub height: usize,
     pub owner: i32
 }
 
 impl Checker {
-    pub fn new(h: i32, o: i32) -> Checker {
+    pub fn new(h: usize, o: i32) -> Checker {
         Checker { height: h, owner: o }
     }
 }

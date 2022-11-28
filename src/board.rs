@@ -1,6 +1,9 @@
 use std::fmt::{Display, Error, Formatter};
 use std::vec::{Vec};
 
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+
 use crate::game::{Checker, Stone, PLAYER_A_ID, PLAYER_B_ID, EMPTY_PLAYER_ID};
 use crate::vec::{Vec2};
 
@@ -23,6 +26,7 @@ pub enum MoveError {
     NegationError,
 }
 
+#[derive(Clone, Debug)]
 pub enum FireError {
     // Move was out not a valid board index
     IndexError,
@@ -30,6 +34,7 @@ pub enum FireError {
     NoAttackersError,
 }
 
+#[derive(Clone, Debug)]
 pub enum SlideError {
     // Thrown when move index is out of bounds.
     IndexError,
@@ -67,7 +72,8 @@ impl Display for MoveError {
 
 pub struct Board {
     checker_board: [Checker; BOARD_WIDTH * BOARD_HEIGHT],
-    stone_board: [Stone; (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)]
+    stone_board: [Stone; (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)],
+    rng: StdRng
 }
 
 impl Board {
@@ -78,7 +84,22 @@ impl Board {
     pub fn new() -> Board {
         let mut board = Board {
             checker_board: [Checker{height: 0, owner: EMPTY_PLAYER_ID}; BOARD_WIDTH * BOARD_HEIGHT],
-            stone_board: [Stone{owner: EMPTY_PLAYER_ID}; (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)] 
+            stone_board: [Stone{owner: EMPTY_PLAYER_ID}; (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)],
+            rng: StdRng::from_entropy() 
+        };
+        board.place_start_pieces();
+        board
+    }
+
+    /**
+     * Create a new Board with the given seed for the random number generator.
+     * @seed Array of 32 u8's as a seed.
+     */
+    pub fn from_seed(seed: [u8; 32]) -> Board {
+        let mut board = Board {
+            checker_board: [Checker{height: 0, owner: EMPTY_PLAYER_ID}; BOARD_WIDTH * BOARD_HEIGHT],
+            stone_board: [Stone{owner: EMPTY_PLAYER_ID}; (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)],
+            rng: StdRng::from_seed(seed) 
         };
         board.place_start_pieces();
         board
@@ -144,7 +165,7 @@ impl Board {
      * @pos Square to attempt to attack.
      * @return Ok if no error, or one of the error types if something went wrong.
      */
-    pub fn fire_checker_at(&self, player: i32, pos: Vec2) -> Result<(), FireError> {
+    pub fn fire_checker_at(&self, pos: Vec2) -> Result<(), FireError> {
         Ok(())
     }
 
@@ -712,24 +733,90 @@ mod tests {
         board.place_stone_at(Vec2::new(4, 2), Stone::new(PLAYER_B_ID)).unwrap();
         board.place_stone_at(Vec2::new(3, 1), Stone::new(PLAYER_B_ID)).unwrap();
         board.place_stone_at(Vec2::new(3, 3), Stone::new(PLAYER_B_ID)).unwrap();
-        board.place_stone_at(Vec2::new(3, 2), Stone::new(PLAYER_A_ID)).unwrap();
+        board.place_stone_at(Vec2::new(3, 2), Stone::new(PLAYER_B_ID)).unwrap();
         match board.slide_stone(Vec2::new(3, 2), Direction::Up) {
             Err(SlideError::BlockedError) => (),
             Err(SlideError::IndexError) => panic!("Expected a BlockedError, got an IndexError"),
             Ok(_) => panic!("Expected a BlockedError, got an IndexError")
         }
 
-        // TODO: Normal case -- does it stop when hitting the edge of the board?
-        // TODO: Normal case -- does it stop when hitting another stone?
+        // Normal case -- does it stop when hitting the edge of the board, and does it move?
+        let board_edge_pos = Vec2::new(2, 2);
+        board.slide_stone(board_edge_pos, Direction::Up).unwrap();
+        // Previous position should be empty
+        match board.stone_at(board_edge_pos) {
+            Ok(stone) => assert!(stone.owner == EMPTY_PLAYER_ID),
+            Err(_) => panic!("Expected to slide stone at 2,2 upward, got error instead")
+        }
+        // Board edge position should be occupied
+        match board.stone_at(Vec2::new(2, 0)) {
+            Ok(stone) => assert!(stone.owner == PLAYER_B_ID),
+            Err(_) => panic!("Expected to slide stone at 2,2 upward, got error instead")
+        }
+        // Normal case -- does it stop when hitting another stone?
+        let board_hit_pos = Vec2::new(4, 4);
+        board.place_stone_at(board_hit_pos, Stone::new(PLAYER_B_ID)).unwrap();
+        board.slide_stone(board_hit_pos, Direction::Up).unwrap();
+        // (4, 4) should be empty
+        assert!(board.stone_at(board_hit_pos).unwrap().owner == EMPTY_PLAYER_ID);
+        // Stone should slide to (4,3), because it is blocked by (4,2)
+        assert!(board.stone_at(Vec2::new(4, 3)).unwrap().owner == PLAYER_B_ID);
+
     }
 
     #[test]
     fn fire_checker_at() {
+        // Seed me
+        let mut board = Board::from_seed([0; 32]);
+        // Normal case, checker takes damage and dies
+        board.place_checker_at(Vec2::new(5, 2), Checker::new(3, PLAYER_A_ID)).unwrap();
+        board.fire_checker_at(Vec2::new(5, 2)).unwrap();
+        let post_fire = board.checker_at(Vec2::new(5, 2)).unwrap();
+        assert_eq!(post_fire.height, 0);
+        assert_eq!(post_fire.owner, 0);
+        // Place stones, normal case with terrain
+
+        // IndexError case
+        match board.fire_checker_at(Vec2::new(-1, -1)) {
+            Ok(_) => panic!("Expected an IndexError, got no error"),
+            Err(FireError::NoAttackersError) => panic!("Expected an IndexError, got no a NoAttackersError"),
+            Err(FireError::IndexError) => ()
+        }
+        // Nothing in range case
+        match board.fire_checker_at(Vec2::new(7, 1)) {
+            Ok(_) => panic!("Expected a NoAttackersError, got no error"),
+            Err(FireError::NoAttackersError) => (),
+            Err(FireError::IndexError) => panic!("Expected an IndexError, got an IndexError")
+        }
 
     }
 
     #[test]
     fn move_checker() {
+        let board = Board::new();
+        // Normal case
+        let start = Vec2::new(1, 2);
+        let end = Vec2::new(2, 2);
+        let start_checker = board.checker_at(start).unwrap();
+        board.move_checker(start, end).unwrap();
+        // Start should not be occupied
+        assert!(board.checker_at(start).unwrap().owner == EMPTY_PLAYER_ID);
+        // End should contain start
+        assert!(*board.checker_at(end).unwrap() == *start_checker);
 
+        // Trying to move to an occupied square
+        match board.move_checker(Vec2::new(1, 3), Vec2::new(0, 3)) {
+            Ok(_) => panic!("Expected an OccupiedError, got no error"),
+            Err(MoveError::IndexError(_)) => panic!("Expected an OccupiedError, got IndexError"),
+            Err(MoveError::NegationError) => panic!("Expected am OccupiedError, got NegationError"),
+            Err(MoveError::OccupiedError) => ()
+        }
+        // Trying to move out of bounds
+        match board.move_checker(Vec2::new(0, 2), Vec2::new(-1, 2)) {
+            Ok(_) => panic!("Expected an IndexError, got no error"),
+            Err(MoveError::IndexError(_)) => (),
+            Err(MoveError::NegationError) => panic!("Expected a IndexError, got an NegationError"),
+            Err(MoveError::OccupiedError) => panic!("Expected an IndexError, got an OccupiedError")
+        }
     }
 }

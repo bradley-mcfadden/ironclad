@@ -32,6 +32,10 @@ impl Vec2 {
     pub fn down(self) -> Vec2 {
         self + DOWN
     }
+
+    pub fn scale(self, factor: i32) -> Vec2 {
+        Vec2::new(self.x * factor, self.y * factor)
+    }
 }
 
 impl Add for Vec2 {
@@ -97,5 +101,12 @@ mod tests {
     fn vec_right() {
         let v = Vec2::new(2, 2);
         assert_eq!(v.right(), v + RIGHT)
+    }
+
+    #[test]
+    fn scale() {
+        let v = Vec2::new(1, 1);
+        assert_eq!(v.scale(2), Vec2::new(2, 2));
+        assert_eq!(v.scale(0), Vec2::new(0, 0));
     }
 }
