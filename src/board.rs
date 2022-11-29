@@ -2,10 +2,10 @@ use std::fmt::{Display, Error, Formatter};
 use std::vec::{Vec};
 
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngCore, SeedableRng};
 
 use crate::game::{Checker, Stone, PLAYER_A_ID, PLAYER_B_ID, EMPTY_PLAYER_ID};
-use crate::vec::{Vec2};
+use crate::vec::{Vec2, UP, LEFT, RIGHT, DOWN};
 
 const BOARD_WIDTH: usize = 8;
 const BOARD_HEIGHT: usize = 6;
@@ -135,7 +135,6 @@ impl Board {
     }
 
     /**
-     * TODO: Implement me and test
      * move_checker from @from to @to, returning Ok if the move is accepted, and an error otherwise.
      * @from Position of checker to move.
      * @to Position to move checker to.
@@ -161,26 +160,109 @@ impl Board {
     }
 
     /**
-     * TODO: Implement me and test
+     * TODO: Test me
      * slide_stone
      * Slide a stone in a Direction as many squares as possible.
      * @from Position of stone to slide.
      * @dir Direction to move stone in.
      * @ret Ok if slide is legal, or SlideError if something went wrong.
      */
-    pub fn slide_stone(&self, from: Vec2, dir: Direction) -> Result<(), SlideError> {
+    pub fn slide_stone(&mut self, from: Vec2, dir: Direction) -> Result<(), SlideError> {
+        if !Board::is_stone_vec_valid(from) {
+            return Err(SlideError::IndexError)
+        }
+        let target = from + dir.as_vec();
+        if !Board::is_stone_vec_valid(target) {
+            return Err(SlideError::BlockedError)
+        }
+        let target_idx = Board::vec_to_stone_idx(target);
+        if self.stone_board[target_idx].owner != EMPTY_PLAYER_ID {
+            return Err(SlideError::BlockedError)
+        }
+        let mut last_free_position = target;
+        loop {
+            let next_target = target + dir.as_vec();
+            let idx = Board::vec_to_stone_idx(next_target);
+            match self.stone_board.get(idx) {
+                Some(stone) => {
+                    if stone.owner != EMPTY_PLAYER_ID {
+                        break;
+                    }
+                },
+                None => break
+            }
+            last_free_position = next_target;
+        }
+        let new_idx = Board::vec_to_stone_idx(last_free_position);
+        let old_idx  = Board::vec_to_stone_idx(from);
+        self.stone_board.swap(new_idx, old_idx);
+
         Ok(())
     }
 
     /**
-     * TODO: Implement me and test
+     * TODO: Test me
      * fire_checker_at
      * Player of id @player attacks the checker at @pos, with all possible pieces in range, or errors.
      * @player Player id 
      * @pos Square to attempt to attack.
      * @return Ok if no error, or one of the error types if something went wrong.
      */
-    pub fn fire_checker_at(&self, pos: Vec2) -> Result<(), FireError> {
+    pub fn fire_checker_at(&mut self, pos: Vec2) -> Result<(), FireError> {
+        let checker_idx = Board::vec_to_checker_idx(pos);
+        let checker = match self.checker_board.get(checker_idx) {
+            Some(x) => x,
+            None => return Err(FireError::IndexError)
+        };
+
+        // Check neighbourhood for attackers
+        let mut attackers = 0;
+        let dirs = vec![UP, DOWN, LEFT, RIGHT, UP + LEFT, UP + RIGHT, DOWN + LEFT, DOWN + RIGHT];
+        for dir in dirs.iter() {
+            for scale_factor in 1..3 {
+                let offset = dir.scale(scale_factor);
+                let neighbour_pos = pos + offset;
+                let neighbour_idx = Board::vec_to_checker_idx(neighbour_pos);
+                match self.checker_board.get(neighbour_idx) {
+                    Some(x) => {
+                        if x.owner != checker.owner {
+                            attackers += 1;
+                        }
+                    },
+                    None => (),
+                };
+            }
+        }
+        if attackers == 0 {
+            return Err(FireError::NoAttackersError)
+        }
+        // Get terrain bonus
+        let mut terrain_bonus = 0;
+        for stone_pos in Board::stone_neighbours_of_checker(pos).iter() {
+            let idx = Board::vec_to_stone_idx(*stone_pos);
+            match self.stone_board.get(idx) {
+                Some(s) => {
+                    if s.owner != EMPTY_PLAYER_ID {
+                        terrain_bonus += 1;
+                    }
+                }
+                None => (),
+            }
+        }
+        // For each attack, roll a die
+        let mut dmg = 0;
+        for _ in 0..attackers {
+            // If die > terrain bonus, checker takes 1 damage
+            if self.rng.next_u32() >= terrain_bonus {
+                dmg += 1;
+            }
+        }
+        let new_height = checker.height - dmg;
+        if new_height <= 0 {
+            self.checker_board[checker_idx] = Checker::new(0, EMPTY_PLAYER_ID);
+        } else {
+            self.checker_board[checker_idx] = Checker::new(new_height, checker.owner);
+        }
         Ok(())
     }
 
