@@ -10,10 +10,10 @@ use crate::vec::{Vec2, UP, LEFT, RIGHT, DOWN};
 const BOARD_WIDTH: usize = 8;
 const BOARD_HEIGHT: usize = 6;
 
-const PLAYER_A_CHECK: [char; 4] = [' ', '░', '▒', '▓'];
+const PLAYER_A_CHECK: [char; 4] = ['.', 'a', 'b', 'c'];
 const PLAYER_A_STONE: char = 'a';
 
-const PLAYER_B_CHECK: [char; 4] = [' ', '▁', '▃', '▇'];
+const PLAYER_B_CHECK: [char; 4] = ['.', '1', '2', '3'];
 const PLAYER_B_STONE: char = 'b';
 
 #[derive(Clone, Debug)]
@@ -543,6 +543,9 @@ impl Board {
         self.stones_for_player(EMPTY_PLAYER_ID)
     }
 
+    /**
+     * TODO: test me
+     */
     pub fn print(&self) {
         for yi in 0 .. BOARD_HEIGHT as i32 * 2 + 1 {
             let turn = yi % 2;
@@ -555,7 +558,7 @@ impl Board {
                     // print row of stones
                     let stone = self.stone_board[idx];
                     
-                    let mut draw_char: char = ' ';
+                    let mut draw_char: char = '.';
                     if stone.owner == PLAYER_A_ID {
                         draw_char = PLAYER_A_STONE;
                     } else if stone.owner == PLAYER_B_ID {
@@ -565,7 +568,7 @@ impl Board {
                 } else if turn == 1 {
                     let checker = self.checker_board[idx];
                     
-                    let mut draw_char: char = ' ';
+                    let mut draw_char: char = '.';
                     if checker.owner == PLAYER_A_ID {
                         draw_char = PLAYER_A_CHECK[checker.height as usize];
                     } else if checker.owner == PLAYER_B_ID {
