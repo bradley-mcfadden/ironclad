@@ -141,7 +141,22 @@ impl Board {
      * @to Position to move checker to.
      * @ret Ok if move is legal, or a MoveError if something went wrong.
      */
-    pub fn move_checker(&self, from: Vec2, to: Vec2) -> Result<(), MoveError> {
+    pub fn move_checker(&mut self, from: Vec2, to: Vec2) -> Result<(), MoveError> {
+        for vec in vec![from, to].iter() {
+            if !Board::is_checker_vec_valid(*vec) {
+                return Err(MoveError::IndexError(String::from("{vec} is not a valid checker position")));
+            }
+        }
+        let to_checker = self.checker_at_unsafe(to);
+        if to_checker.owner != EMPTY_PLAYER_ID {
+            return Err(MoveError::OccupiedError);
+        }
+
+        let to_idx = Board::vec_to_checker_idx(to);
+        let from_idx = Board::vec_to_checker_idx(from);
+
+        self.checker_board.swap(to_idx, from_idx);
+
         Ok(())
     }
 
@@ -305,6 +320,15 @@ impl Board {
         }
     }
 
+    pub fn mut_checker_at<'a>(&'a mut self, pos: Vec2) -> Result<&'a mut Checker, ()> {
+        if !Board::is_checker_vec_valid(pos) {
+            Err(())
+        } else {
+            let idx: usize = Board::vec_to_checker_idx(pos); 
+            Ok(&mut self.checker_board[idx])
+        }
+    }
+
     /**
      * stone_at returns the Stone on the board at the provided position, or an error
      * if the position was not in range.
@@ -320,6 +344,15 @@ impl Board {
         }
     }
 
+    pub fn mut_stone_at<'a>(&'a mut self, pos: Vec2) -> Result<&'a mut Stone, ()> {
+        if !Board::is_stone_vec_valid(pos) {
+            Err(())
+        } else {
+            let idx: usize = Board::vec_to_stone_idx(pos); 
+            Ok(&mut self.stone_board[idx])
+        }
+    }
+
     // Use when @pos has already been bounds-checked
     fn checker_at_unsafe<'a>(&'a self, pos: Vec2) -> &'a Checker {
         let idx: usize = Board::vec_to_checker_idx(pos); 
@@ -328,6 +361,16 @@ impl Board {
 
     // Use when @pos has already been bounds-checked
     fn stone_at_unsafe<'a>(&'a self, pos: Vec2) -> &'a Stone {
+        let idx: usize = Board::vec_to_stone_idx(pos); 
+        &self.stone_board[idx]
+    }
+
+    fn mut_checker_at_unsafe<'a>(&'a mut self, pos: Vec2) -> &'a Checker {
+        let idx: usize = Board::vec_to_checker_idx(pos); 
+        &self.checker_board[idx]
+    }
+
+    fn mut_stone_at_unsafe<'a>(&'a mut self, pos: Vec2) -> &'a Stone {
         let idx: usize = Board::vec_to_stone_idx(pos); 
         &self.stone_board[idx]
     }
@@ -774,7 +817,17 @@ mod tests {
         let post_fire = board.checker_at(Vec2::new(5, 2)).unwrap();
         assert_eq!(post_fire.height, 0);
         assert_eq!(post_fire.owner, 0);
-        // Place stones, normal case with terrain
+
+        // Place stones, normal case with terrain, expect a certain result based on RNG rolls
+        let stone_pos = vec![Vec2::new(4, 2), Vec2::new(4, 3), Vec2::new(5, 2), Vec2::new(5, 3)];
+        for pos in stone_pos.iter() {
+            board.place_stone_at(*pos, Stone::new(PLAYER_A_ID)).unwrap();
+        }
+        board.place_checker_at(Vec2::new(4, 2), Checker::new(3, PLAYER_A_ID)).unwrap();
+        board.fire_checker_at(Vec2::new(4, 2)).unwrap();
+        let victim = board.checker_at(Vec2::new(4, 2)).unwrap();
+        assert_eq!(victim.height, 3); // change me once RNG damage is implemented
+        assert_eq!(victim.owner, PLAYER_A_ID); // change me once RNG damage is implemented
 
         // IndexError case
         match board.fire_checker_at(Vec2::new(-1, -1)) {
@@ -793,16 +846,16 @@ mod tests {
 
     #[test]
     fn move_checker() {
-        let board = Board::new();
+        let mut board = Board::new();
         // Normal case
         let start = Vec2::new(1, 2);
         let end = Vec2::new(2, 2);
-        let start_checker = board.checker_at(start).unwrap();
+        let start_checker = board.checker_at(start).unwrap().clone();
         board.move_checker(start, end).unwrap();
         // Start should not be occupied
         assert!(board.checker_at(start).unwrap().owner == EMPTY_PLAYER_ID);
         // End should contain start
-        assert!(*board.checker_at(end).unwrap() == *start_checker);
+        assert!(*board.checker_at(end).unwrap() == start_checker);
 
         // Trying to move to an occupied square
         match board.move_checker(Vec2::new(1, 3), Vec2::new(0, 3)) {
