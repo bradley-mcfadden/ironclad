@@ -240,13 +240,10 @@ impl Board {
         let mut terrain_bonus = 0;
         for stone_pos in Board::stone_neighbours_of_checker(pos).iter() {
             let idx = Board::vec_to_stone_idx(*stone_pos);
-            match self.stone_board.get(idx) {
-                Some(s) => {
-                    if s.owner != EMPTY_PLAYER_ID {
-                        terrain_bonus += 1;
-                    }
+            if let Some(s) = self.stone_board.get(idx) {
+                if s.owner != EMPTY_PLAYER_ID {
+                    terrain_bonus += 1;
                 }
-                None => (),
             }
         }
         // For each attack, roll a die
