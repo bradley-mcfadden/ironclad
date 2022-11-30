@@ -1,4 +1,4 @@
-
+use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
 pub const UP: Vec2 = Vec2 { x: 0, y: -1 };
@@ -56,6 +56,12 @@ impl Sub for Vec2 {
             x: self.x - rhs.x,
             y: self.y - rhs.y
         }
+    }
+}
+
+impl Display for Vec2 {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), std::fmt::Error> { 
+        write!(fmt, "Vec2 x:{} y:{}", self.x, self.y)
     }
 }
 

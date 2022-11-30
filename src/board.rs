@@ -10,11 +10,14 @@ use crate::vec::{Vec2, UP, LEFT, RIGHT, DOWN};
 const BOARD_WIDTH: usize = 8;
 const BOARD_HEIGHT: usize = 6;
 
-const PLAYER_A_CHECK: [char; 4] = ['.', 'a', 'b', 'c'];
+const PLAYER_A_CHECK: [char; 4] = ['.', 'A', 'B', 'C'];
 const PLAYER_A_STONE: char = 'a';
 
 const PLAYER_B_CHECK: [char; 4] = ['.', '1', '2', '3'];
 const PLAYER_B_STONE: char = 'b';
+
+const EMPTY_STONE: char = '.';
+const EMPTY_CHECKER: char = '_';
 
 #[derive(Clone, Debug)]
 pub enum MoveError {
@@ -160,7 +163,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * slide_stone
      * Slide a stone in a Direction as many squares as possible.
      * @from Position of stone to slide.
@@ -181,15 +183,13 @@ impl Board {
         }
         let mut last_free_position = target;
         loop {
-            let next_target = target + dir.as_vec();
+            let next_target = last_free_position + dir.as_vec();
+            if !Board::is_stone_vec_valid(next_target) {
+                break;
+            }
             let idx = Board::vec_to_stone_idx(next_target);
-            match self.stone_board.get(idx) {
-                Some(stone) => {
-                    if stone.owner != EMPTY_PLAYER_ID {
-                        break;
-                    }
-                },
-                None => break
+            if self.stone_board[idx].owner != EMPTY_PLAYER_ID {
+                break;
             }
             last_free_position = next_target;
         }
@@ -201,7 +201,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * fire_checker_at
      * Player of id @player attacks the checker at @pos, with all possible pieces in range, or errors.
      * @player Player id 
@@ -209,11 +208,11 @@ impl Board {
      * @return Ok if no error, or one of the error types if something went wrong.
      */
     pub fn fire_checker_at(&mut self, pos: Vec2) -> Result<(), FireError> {
+        if !Board::is_checker_vec_valid(pos) {
+            return Err(FireError::IndexError);
+        }
         let checker_idx = Board::vec_to_checker_idx(pos);
-        let checker = match self.checker_board.get(checker_idx) {
-            Some(x) => x,
-            None => return Err(FireError::IndexError)
-        };
+        let checker = self.checker_board[checker_idx];
 
         // Check neighbourhood for attackers
         let mut attackers = 0;
@@ -222,17 +221,18 @@ impl Board {
             for scale_factor in 1..3 {
                 let offset = dir.scale(scale_factor);
                 let neighbour_pos = pos + offset;
+                if !Board::is_checker_vec_valid(neighbour_pos) {
+                    continue;
+                }
                 let neighbour_idx = Board::vec_to_checker_idx(neighbour_pos);
-                match self.checker_board.get(neighbour_idx) {
-                    Some(x) => {
-                        if x.owner != checker.owner {
-                            attackers += 1;
-                        }
-                    },
-                    None => (),
-                };
+                let neigh = self.checker_board[neighbour_idx];
+                if neigh.owner != checker.owner && neigh.owner != EMPTY_PLAYER_ID {
+                    println!("Attacker at {neighbour_pos}");
+                    attackers += 1;
+                }
             }
         }
+        println!("{attackers}");
         if attackers == 0 {
             return Err(FireError::NoAttackersError)
         }
@@ -253,12 +253,13 @@ impl Board {
         let mut dmg = 0;
         for _ in 0..attackers {
             // If die > terrain bonus, checker takes 1 damage
-            if self.rng.next_u32() >= terrain_bonus {
+            let roll = self.rng.next_u32() % 6 + 1;
+            if roll >= terrain_bonus {
                 dmg += 1;
             }
         }
-        let new_height = checker.height - dmg;
-        if new_height <= 0 {
+        let new_height = checker.height.checked_sub(dmg).unwrap_or(0);
+        if new_height == 0 {
             self.checker_board[checker_idx] = Checker::new(0, EMPTY_PLAYER_ID);
         } else {
             self.checker_board[checker_idx] = Checker::new(new_height, checker.owner);
@@ -378,6 +379,8 @@ impl Board {
         neighbours.push(pos.right());
         neighbours.push(pos.up().left());
         neighbours.push(pos.up().right());
+        neighbours.push(pos.down());
+        neighbours.push(pos.up());
 
         let mut out: Vec<Vec2> = Vec::new();
         for pos in neighbours.iter() {
@@ -447,16 +450,6 @@ impl Board {
         &self.stone_board[idx]
     }
 
-    fn mut_checker_at_unsafe<'a>(&'a mut self, pos: Vec2) -> &'a Checker {
-        let idx: usize = Board::vec_to_checker_idx(pos); 
-        &self.checker_board[idx]
-    }
-
-    fn mut_stone_at_unsafe<'a>(&'a mut self, pos: Vec2) -> &'a Stone {
-        let idx: usize = Board::vec_to_stone_idx(pos); 
-        &self.stone_board[idx]
-    }
-
     /**
      * vec_to_stone_idx
      * @pos - Position to convert into an index.
@@ -469,19 +462,11 @@ impl Board {
     }
 
     fn is_checker_vec_valid(pos: Vec2) -> bool {
-        if pos.x < 0 || pos.y < 0 {
-            return false;
-        }
-        let idx = Board::vec_to_checker_idx(pos);
-        idx < BOARD_WIDTH * BOARD_HEIGHT
+        !(pos.x < 0 || pos.y < 0 || pos.x >= BOARD_WIDTH as i32 || pos.y >= BOARD_HEIGHT as i32)
     }
 
     fn is_stone_vec_valid(pos: Vec2) -> bool {
-        if pos.x < 0 || pos.y < 0 {
-            return false;
-        }
-        let idx = Board::vec_to_stone_idx(pos);
-        idx < (BOARD_WIDTH + 1) * (BOARD_HEIGHT + 1)
+        !(pos.x < 0 || pos.y < 0 || pos.x >= (BOARD_WIDTH + 1) as i32 || pos.y >= (BOARD_HEIGHT + 1) as i32)
     }
 
     /**
@@ -496,7 +481,6 @@ impl Board {
     }
 
     /**
-     * TODO: Test me
      * stones_for_player returns the positions of all stones belonging
      * to @player.
      * @player Player id to match against stone.owner.
@@ -544,41 +528,51 @@ impl Board {
     }
 
     /**
-     * TODO: test me
+     * as_string
+     * Stones and checker rows are printed interlaced.
+     * ret - String representation of pieces on the board. 
      */
-    pub fn print(&self) {
-        for yi in 0 .. BOARD_HEIGHT as i32 * 2 + 1 {
-            let turn = yi % 2;
-            for xi in 0 .. BOARD_WIDTH as i32 * 2 + 1 {
-                if xi % 2 == turn {
-                    continue;
-                }
-                let idx = Board::vec_to_stone_idx(Vec2::new(xi >> 2, yi >> 2)); 
-                if turn == 0 {
-                    // print row of stones
-                    let stone = self.stone_board[idx];
-                    
-                    let mut draw_char: char = '.';
+    pub fn as_string(&self) -> String {
+        let mut string = String::new();
+        for yi in 0..=BOARD_HEIGHT as i32 {
+            for xi in 0..=BOARD_WIDTH as i32 {
+                let idx = Board::vec_to_stone_idx(Vec2::new(xi, yi));
+                let stone = self.stone_board[idx];
+                    let mut draw_char: char = EMPTY_STONE;
                     if stone.owner == PLAYER_A_ID {
                         draw_char = PLAYER_A_STONE;
                     } else if stone.owner == PLAYER_B_ID {
                         draw_char = PLAYER_B_STONE;
                     }
-                    print!("{} ", draw_char);
-                } else if turn == 1 {
-                    let checker = self.checker_board[idx];
-                    
-                    let mut draw_char: char = '.';
-                    if checker.owner == PLAYER_A_ID {
-                        draw_char = PLAYER_A_CHECK[checker.height as usize];
-                    } else if checker.owner == PLAYER_B_ID {
-                        draw_char = PLAYER_B_CHECK[checker.height as usize];
-                    }
-                    print!("{} ", draw_char);
+                    string.push(draw_char);
+                    string.push(' ');
+                    // print!("{} ", draw_char);
+            }
+            string.push_str("\n");
+            if yi >= BOARD_HEIGHT as i32 { continue; }
+            
+            for xi in 0..BOARD_WIDTH as i32{
+                let idx = Board::vec_to_checker_idx(Vec2::new(xi, yi));
+                let checker = self.checker_board[idx];
+                let mut draw_char: char = EMPTY_CHECKER;
+                if checker.owner == PLAYER_A_ID {
+                    draw_char = PLAYER_A_CHECK[checker.height as usize];
+                } else if checker.owner == PLAYER_B_ID {
+                    draw_char = PLAYER_B_CHECK[checker.height as usize];
                 }
-            } 
-            println!()
+                // print!(" {}", draw_char);
+                string.push(' ');
+                string.push(draw_char);
+            }
+            string.push('\n');
         }
+        string
+    }
+}
+
+impl Display for Board {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), std::fmt::Error> { 
+        write!(fmt, "{}", self.as_string())
     }
 }
 
@@ -823,7 +817,7 @@ mod tests {
     #[test]
     fn checkers_for_player() {
         let board = Board::new();
-        let checkers_a = board.checkers_for_player(PLAYER_A_ID);
+        let checkers_a = board.checkers_for_player(PLAYER_B_ID);
         let positions = vec![
             Vec2::new(0, 1), Vec2::new(0, 2), Vec2::new(0, 3), 
             Vec2::new(0, 4), Vec2::new(1, 2), Vec2::new(1, 3)
@@ -857,7 +851,7 @@ mod tests {
             Ok(_) => panic!("Expected an IndexError, got no error")
         }
 
-        board.place_stone_at(Vec2::new(2, 2), Stone::new(PLAYER_B_ID)).unwrap();
+        // board.place_stone_at(Vec2::new(2, 2), Stone::new(PLAYER_B_ID)).unwrap();
         board.place_stone_at(Vec2::new(4, 2), Stone::new(PLAYER_B_ID)).unwrap();
         board.place_stone_at(Vec2::new(3, 1), Stone::new(PLAYER_B_ID)).unwrap();
         board.place_stone_at(Vec2::new(3, 3), Stone::new(PLAYER_B_ID)).unwrap();
@@ -869,26 +863,26 @@ mod tests {
         }
 
         // Normal case -- does it stop when hitting the edge of the board, and does it move?
-        let board_edge_pos = Vec2::new(2, 2);
+        let board_edge_pos = Vec2::new(4, 2);
         board.slide_stone(board_edge_pos, Direction::Up).unwrap();
         // Previous position should be empty
         match board.stone_at(board_edge_pos) {
-            Ok(stone) => assert!(stone.owner == EMPTY_PLAYER_ID),
+            Ok(stone) => assert_eq!(stone.owner, EMPTY_PLAYER_ID),
             Err(_) => panic!("Expected to slide stone at 2,2 upward, got error instead")
         }
         // Board edge position should be occupied
-        match board.stone_at(Vec2::new(2, 0)) {
-            Ok(stone) => assert!(stone.owner == PLAYER_B_ID),
-            Err(_) => panic!("Expected to slide stone at 2,2 upward, got error instead")
+        match board.stone_at(Vec2::new(4, 0)) {
+            Ok(stone) => assert_eq!(stone.owner, PLAYER_B_ID),
+            Err(_) => panic!("Expected to slide stone at 4,2 upward, got error instead")
         }
         // Normal case -- does it stop when hitting another stone?
         let board_hit_pos = Vec2::new(4, 4);
         board.place_stone_at(board_hit_pos, Stone::new(PLAYER_B_ID)).unwrap();
         board.slide_stone(board_hit_pos, Direction::Up).unwrap();
         // (4, 4) should be empty
-        assert!(board.stone_at(board_hit_pos).unwrap().owner == EMPTY_PLAYER_ID);
-        // Stone should slide to (4,3), because it is blocked by (4,2)
-        assert!(board.stone_at(Vec2::new(4, 3)).unwrap().owner == PLAYER_B_ID);
+        assert_eq!(board.stone_at(board_hit_pos).unwrap().owner, EMPTY_PLAYER_ID);
+        // Stone should slide to (4,1), because it is blocked by (4,0)
+        assert_eq!(board.stone_at(Vec2::new(4, 1)).unwrap().owner, PLAYER_B_ID);
 
     }
 
@@ -897,22 +891,22 @@ mod tests {
         // Seed me
         let mut board = Board::from_seed([0; 32]);
         // Normal case, checker takes damage and dies
-        board.place_checker_at(Vec2::new(5, 2), Checker::new(3, PLAYER_A_ID)).unwrap();
+        board.place_checker_at(Vec2::new(5, 2), Checker::new(3, PLAYER_B_ID)).unwrap();
         board.fire_checker_at(Vec2::new(5, 2)).unwrap();
         let post_fire = board.checker_at(Vec2::new(5, 2)).unwrap();
         assert_eq!(post_fire.height, 0);
-        assert_eq!(post_fire.owner, 0);
+        assert_eq!(post_fire.owner, EMPTY_PLAYER_ID);
 
         // Place stones, normal case with terrain, expect a certain result based on RNG rolls
         let stone_pos = vec![Vec2::new(4, 2), Vec2::new(4, 3), Vec2::new(5, 2), Vec2::new(5, 3)];
         for pos in stone_pos.iter() {
-            board.place_stone_at(*pos, Stone::new(PLAYER_A_ID)).unwrap();
+            board.place_stone_at(*pos, Stone::new(PLAYER_B_ID)).unwrap();
         }
-        board.place_checker_at(Vec2::new(4, 2), Checker::new(3, PLAYER_A_ID)).unwrap();
+        board.place_checker_at(Vec2::new(4, 2), Checker::new(3, PLAYER_B_ID)).unwrap();
         board.fire_checker_at(Vec2::new(4, 2)).unwrap();
         let victim = board.checker_at(Vec2::new(4, 2)).unwrap();
-        assert_eq!(victim.height, 3); // change me once RNG damage is implemented
-        assert_eq!(victim.owner, PLAYER_A_ID); // change me once RNG damage is implemented
+        assert_eq!(victim.height, 2); 
+        assert_eq!(victim.owner, PLAYER_B_ID);
 
         // IndexError case
         match board.fire_checker_at(Vec2::new(-1, -1)) {
@@ -920,6 +914,7 @@ mod tests {
             Err(FireError::NoAttackersError) => panic!("Expected an IndexError, got no a NoAttackersError"),
             Err(FireError::IndexError) => ()
         }
+        board.reset();
         // Nothing in range case
         match board.fire_checker_at(Vec2::new(7, 1)) {
             Ok(_) => panic!("Expected a NoAttackersError, got no error"),
@@ -956,5 +951,29 @@ mod tests {
             Err(MoveError::NegationError) => panic!("Expected a IndexError, got an NegationError"),
             Err(MoveError::OccupiedError) => panic!("Expected an IndexError, got an OccupiedError")
         }
+    }
+
+    #[test]
+    fn as_string() {
+        let mut board = Board::new();
+        board.place_stone_at(Vec2::new(0, 0), Stone::new(PLAYER_A_ID)).unwrap();
+        board.place_stone_at(Vec2::new(0,  6), Stone::new(PLAYER_B_ID)).unwrap();
+        let expected = 
+"a . . . . . . . . 
+ _ _ _ _ _ _ _ _
+. . . . . . . . . 
+ 2 _ _ _ _ _ _ B
+. . . . . . . . . 
+ 3 1 _ _ _ _ A C
+. . . . . . . . . 
+ 3 1 _ _ _ _ A C
+. . . . . . . . . 
+ 2 _ _ _ _ _ _ B
+. . . . . . . . . 
+ _ _ _ _ _ _ _ _
+b . . . . . . . . 
+";
+        let rep = board.as_string();
+        assert_eq!(rep, expected);
     }
 }
