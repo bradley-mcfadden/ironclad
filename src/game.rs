@@ -1,6 +1,7 @@
 
-use std::vec::Vec;
-use crate::{board::Board, vec::Vec2};
+use std::{vec::Vec, io::empty};
+use crate::vec::Vec2;
+use crate::board::{Board, Direction};
 
 pub const EMPTY_PLAYER_ID: i32 = -1;
 pub const PLAYER_A_ID: i32 = 1;
@@ -122,35 +123,79 @@ impl<'a> Game<'a> {
      * of the same color proceeds from one side of the board to another.
      * Returns reference to winner or none.
      */
-    // fn check_for_stone_win
+    fn check_for_stone_win(&self) -> Option<i32> {
+        None
+    }
     /*
      * Helper function returing if a checker has reached the opposite side of
      * the board it started on.
      * Returns reference to winner or none.
      */
-    // fn check_for_checker_win
+    fn check_for_checker_win(&self) -> Option<i32> {
+        None
+    }
     /*
      * Helper function returning winner if law of circularity (circular slide move)
      * has been violated.
      * Returns reference to winner or none.
      */
-    // fn check_for_circularity_win
+    fn check_for_circularity_win(&self) -> Option<i32> {
+        None
+    }
+
     /*
      * Helper function returning empty neighbour positions around a checker position.
      * Returns an array of Vec2.
      */
-    // fn empty_checker_n_at
+    fn empty_checker_n_at(&self, pos: Vec2) -> Vec<Vec2> {
+        let mut empty_neighbours: Vec<Vec2> = Vec::new();
+        for npos in Board::checker_neighbours(pos).iter() {
+            if self.board.checker_at(*npos).unwrap().owner == EMPTY_PLAYER_ID {
+                empty_neighbours.push(pos);
+            }
+        }
+        empty_neighbours
+    }
     /*
-     * Helper function returning empty stone directions around a stone positions.
+     * Helper function returning empty stone directions around a stone position.
      * Returns an array of Direction.
      */
-    // fn empty_stone_n_at
+    fn empty_stone_n_at(&self, pos: Vec2) -> Vec<Direction> {
+        let mut empty_directions: Vec<Direction> = Vec::new();
+        let directions = [
+            Direction::Up, Direction::Down, Direction::Left, Direction::Right
+        ];
+        for dir in directions.iter() {
+            let npos = pos + dir.as_vec();
+            if let Ok(stone) = self.board.stone_at(npos) {
+                if stone.owner == EMPTY_PLAYER_ID {
+                    empty_directions.push(*dir);
+                }
+            }
+        }
+        empty_directions
+    }
     /*
-     * Helper function returning valid stone placement positions (empty and not bordering)
-     * a square with a checker.
+     * Helper function returning valid stone placement positions (empty and not bordering
+     * a square with a checker).
      * Returns an array of Vec2 
      */
-    // fn valid_stone_places
+    fn valid_stone_places(&self) -> Vec<Vec2> {
+        let mut valid_pos : Vec<Vec2> = Vec::new();
+        for pos in self.board.empty_stones().iter() {
+            let mut is_valid = true;
+            for cpos in Board::checker_neigbours_of_stone(*pos).iter() {
+                if self.board.stone_at(*cpos).unwrap().owner != EMPTY_PLAYER_ID {
+                    is_valid = false;
+                    break;
+                }
+            }
+            if is_valid {
+                valid_pos.push(*pos);
+            }
+        }
+        valid_pos
+    }
 }
 
 pub struct Player<'a> {
