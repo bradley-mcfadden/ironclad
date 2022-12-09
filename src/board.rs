@@ -1,3 +1,7 @@
+/**
+ * Stores board and related classes that track the state of the board,
+ * and can answer questions about it.
+ */
 use std::fmt::{Display, Error, Formatter};
 use std::vec::{Vec};
 
@@ -51,6 +55,18 @@ pub enum Direction {
     Down,
     Left,
     Right
+}
+
+impl Display for Direction {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let string = match self {
+            Direction::Down => "down",
+            Direction::Left => "left",
+            Direction::Right => "right",
+            Direction::Up => "up",
+        };
+        formatter.write_str(string)
+    }
 }
 
 impl Direction {

@@ -1,6 +1,10 @@
+/**
+ * 2D vector used for positions on a 2D grid.
+ */
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
+/* Constants for commonly used vectors. */
 pub const UP: Vec2 = Vec2 { x: 0, y: -1 };
 pub const DOWN: Vec2 = Vec2 { x: 0, y: 1 };
 pub const LEFT: Vec2 = Vec2 { x: -1, y: 0 };

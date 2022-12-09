@@ -1,4 +1,9 @@
+/**
+ * Main class that enforces the rules of the game, collects player
+ * input, and applies moves to the board.
+ */
 
+use std::io;
 use std::vec::Vec;
 
 use crate::vec::Vec2;
@@ -17,7 +22,7 @@ pub const STARTING_STONES: i32 = 32;
  * Each turn, it checks for a winner.
  */
 pub struct Game<'a> {
-    board: Board,
+    pub board: Board,
     players: [&'a mut Player<'a>; 2],
     // most recent stored at 1
     last_two_slides_a: [Option<Intent>; 2],
@@ -72,7 +77,7 @@ impl<'a> Game<'a> {
                 self.apply_move(player_id, chosen_move);
                 let win_state = self.check_for_win();
                 if win_state.is_some() {
-                    return win_state.unwrap().id;
+                    return win_state.unwrap();
                 }
             }
         }
@@ -83,7 +88,7 @@ impl<'a> Game<'a> {
      * Determine if the board is in a winning state, returning the winning player or None.
      * @ret - Winning player or none.
      */
-    pub fn check_for_win(&self) -> Option<&Player<'a>> {
+    pub fn check_for_win(&self) -> Option<i32> {
         let checks = [
             self.check_for_checker_win(),
             self.check_for_circularity_win(),
@@ -92,9 +97,9 @@ impl<'a> Game<'a> {
         for check in checks {
             if let Some(winner) = check {
                 if winner == PLAYER_A_ID {
-                    return Some(&self.players[0]);
+                    return Some(PLAYER_A_ID);
                 } else if winner == PLAYER_B_ID {
-                    return Some(&self.players[1]);
+                    return Some(PLAYER_B_ID);
                 }
             }
         }
@@ -378,10 +383,113 @@ impl ConsolePlayer {
 }
 
 impl Decide for ConsolePlayer {
+
     fn choose_move(
         &self, move_checkers: Vec<Intent>, fire_checkers: Vec<Intent>, 
         place_stones: Vec<Intent>, slide_stones: Vec<Intent>
     ) -> Intent {
+
+        let chosen_move: Option<Intent> = None;
+        while let None = chosen_move {
+            print!("What would you like to do?\n");
+            println!("M - Move checker");
+            println!("A - Attack checker");
+            println!("P - Place stone");
+            println!("S - Slide stone");
+
+            let mut line = String::new();
+            while let Err(_) = io::stdin().read_line(&mut line){}
+            
+            let choice = line.chars().collect::<Vec<char>>()[0];
+            match choice {
+                'M' => {
+                    let mut idx = 0;
+                    for move_checker in move_checkers.iter() {
+                        if let Intent::MoveChecker(from, to) = move_checker {
+                            println!("{idx} - move checker {from} to {to}");
+                        }
+                        idx += 1;
+                    }
+
+                    let mut line = String::new();
+                    loop {
+                        while let Err(_) = io::stdin().read_line(&mut line) {}
+                        if let Ok(idx) = line.trim().parse::<usize>() { 
+                            if idx < move_checkers.len() {
+                                return move_checkers[idx];
+                            }
+                        }
+                    }
+
+                },
+                'A' => {
+                    let mut idx = 0;
+                    for fire_checker in fire_checkers.iter() {
+                        if let Intent::FireChecker(at) = fire_checker {
+                            println!("{idx} - attack checker at {at}");
+                        }
+                        idx += 1;
+                    }
+
+                    let mut line = String::new();
+                    loop {
+                        while let Err(_) = io::stdin().read_line(&mut line) {}
+                        if let Ok(idx) = line.trim().parse::<usize>() { 
+                            if idx < fire_checkers.len() {
+                                return fire_checkers[idx];
+                            }
+                        }
+                    }
+
+                },
+                'P' => {
+                    let mut idx = 0;
+                    for place_stone in place_stones.iter() {
+                        if let Intent::PlaceStone(at) = place_stone {
+                            println!("{idx} - place stone at {at}");
+                        }
+                        idx += 1;
+                    }
+
+                    let mut line = String::new();
+                    loop {
+                        while let Err(_) = io::stdin().read_line(&mut line) {}
+                        if let Ok(idx) = line.trim().parse::<usize>() { 
+                            if idx < place_stones.len() {
+                                return place_stones[idx];
+                            }
+                        }
+                    }
+
+                },
+                'S' => {
+                    let mut idx = 0;
+                    for slide_stone in slide_stones.iter() {
+                        if let Intent::SlideStone(from, dir) = slide_stone {
+                            println!("{idx} - slide stone from {from} {dir}");
+                        }
+                        idx += 1;
+                    }
+
+                    let mut line = String::new();
+                    loop {
+                        while let Err(_) = io::stdin().read_line(&mut line) {}
+                        if let Ok(idx) = line.trim().parse::<usize>() { 
+                            if idx < slide_stones.len() {
+                                return slide_stones[idx];
+                            }
+                        }
+                    }
+
+                },
+                _ => {
+                    continue;
+                },
+            }
+        } 
+
+
+
         Intent::PlaceStone(Vec2::new(0, 0))
     }
 }
@@ -485,12 +593,88 @@ mod test {
 
     #[test]
     pub fn check_for_win() {
-        panic!()
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
+        let mut game = Game::new(&mut player_a, &mut player_b);
+        // Stones wins
+        // -- normal case, straight line down the middle of the board
+        for player_id in [PLAYER_A_ID, PLAYER_B_ID] {
+            for yi in 0..=(BOARD_HEIGHT as i32) {
+                let place_position = Vec2::new(4, yi);
+                game.apply_move(player_id, Intent::PlaceStone(place_position));
+            }
+            assert_eq!(game.check_for_win(), Some(player_id));
+            game.reset();
+        }
+
+        // Checker wins
+        game.reset();
+        assert_eq!(game.check_for_win(), None);
+
+        game.reset();
+        game.apply_move(PLAYER_A_ID, Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(7, 0)));
+        for xi in (1..7).rev() {
+            let from_position = Vec2::new(xi, 0);
+            let to_position = Vec2::new(xi - 1, 0);
+            game.apply_move(PLAYER_A_ID, Intent::MoveChecker(from_position, to_position));
+        }
+        assert_eq!(game.check_for_win(), Some(PLAYER_A_ID));
+
+        game.reset();
+        game.apply_move(PLAYER_B_ID, Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(0, 0)));
+        for xi in 0..6 {
+            let from_position = Vec2::new(xi, 0);
+            let to_position = Vec2::new(xi + 1, 0);
+            game.apply_move(PLAYER_B_ID, Intent::MoveChecker(from_position, to_position));
+        }
+        assert_eq!(game.check_for_win(), Some(PLAYER_B_ID));
+
+        // Circularity wins
+        game.reset();
+        let from_position = Vec2::new(4, 0);
+        let to_position = Vec2::new(4, BOARD_HEIGHT as i32);
+        game.apply_move(PLAYER_A_ID, Intent::PlaceStone(from_position));
+        game.apply_move(PLAYER_A_ID, Intent::SlideStone(from_position, Direction::Down));
+        game.apply_move(PLAYER_A_ID, Intent::SlideStone(to_position, Direction::Up));
+        assert_eq!(game.check_for_win(), Some(PLAYER_B_ID));
+
+        game.reset();
+        game.apply_move(PLAYER_B_ID, Intent::PlaceStone(from_position));
+        game.apply_move(PLAYER_B_ID, Intent::SlideStone(from_position, Direction::Down));
+        game.apply_move(PLAYER_B_ID, Intent::SlideStone(to_position, Direction::Up));
+        assert_eq!(game.check_for_win(), Some(PLAYER_A_ID));
     }
 
     #[test]
     pub fn checker_moves_for() {
-        panic!()
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
+        let game = Game::new(&mut player_a, &mut player_b);
+
+        {
+            let expected_a_moves = vec![
+                Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(7, 0)), Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(6, 1)),
+                Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(7, 5)), Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(6, 4)),
+                Intent::MoveChecker(Vec2::new(6, 2), Vec2::new(6, 1)), Intent::MoveChecker(Vec2::new(6, 2), Vec2::new(5, 2)),
+                Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(6, 4)), Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(5, 2))
+            ];
+            let actual_a_moves = game.checker_moves_for(PLAYER_A_ID);
+            for move_a in expected_a_moves.iter() {
+                assert!(actual_a_moves.contains(&move_a));
+            }
+        }
+        {
+            let expected_b_moves = vec![
+                Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(0, 0)), Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(1, 1)),
+                Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(0, 5)), Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(1, 4)),
+                Intent::MoveChecker(Vec2::new(1, 2), Vec2::new(1, 1)), Intent::MoveChecker(Vec2::new(1, 2), Vec2::new(2, 2)),
+                Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(1, 4)), Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(2, 3))
+            ];
+            let actual_b_moves = game.checker_moves_for(PLAYER_B_ID);
+            for move_b in expected_b_moves.iter() {
+                assert!(actual_b_moves.contains(&move_b));
+            }
+        }
     }
 
     #[test]
@@ -500,33 +684,123 @@ mod test {
 
     #[test]
     pub fn stone_places_for() {
-        panic!()
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
+        let game = Game::new(&mut player_a, &mut player_b);
+        
+        for player in vec![PLAYER_A_ID, PLAYER_B_ID] {
+            assert_eq!(game.stone_places_for(player).len(), 33);
+        }
     }
     
     #[test]
     pub fn stone_slides_for() {
-        panic!()
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
+        let mut game = Game::new(&mut player_a, &mut player_b);
+
+        let stone_location = Vec2::new(0, 0);
+        game.apply_move(PLAYER_A_ID, Intent::PlaceStone(stone_location));
+
+        let expected = vec![
+            Intent::SlideStone(stone_location, Direction::Up), Intent::SlideStone(stone_location, Direction::Down),
+            Intent::SlideStone(stone_location, Direction::Right), Intent::SlideStone(stone_location, Direction::Left)    
+        ];
+        let actual = game.stone_slides_for(PLAYER_A_ID);
+        for stone_slide in expected.iter() {
+            assert!(actual.contains(stone_slide));
+        }
     }
 
     #[test]
     pub fn apply_move() {
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
 
+        // Moving a checker
+        let mut game = Game::new(&mut player_a, &mut player_b);
+
+        let from_position = Vec2::new(6, 1);
+        let to_position = Vec2::new(6, 0);
+        
+        game.apply_move(PLAYER_A_ID, Intent::MoveChecker(from_position, to_position)); 
+        
+        assert_eq!(game.board.checker_at(to_position).unwrap().owner, PLAYER_A_ID);
+        assert_eq!(game.board.checker_at(from_position).unwrap().owner, EMPTY_PLAYER_ID);
+        
+        // Placing a stone
+        game.reset();
+        let stone_position = Vec2::new(4, 4);
+        game.apply_move(PLAYER_A_ID, Intent::PlaceStone(stone_position));
+        assert_eq!(game.board.stone_at(stone_position).unwrap().owner, PLAYER_A_ID);
+        assert_eq!(game.players[0].stones, STARTING_STONES - 1);
+
+        // Sliding a stone
+        game.apply_move(PLAYER_A_ID, Intent::SlideStone(stone_position, Direction::Up));
+        assert_eq!(game.board.stone_at(stone_position).unwrap().owner, EMPTY_PLAYER_ID);
+        assert_eq!(game.board.stone_at(Vec2::new(4, 0)).unwrap().owner, PLAYER_A_ID);
+
+        // Firing at a checker
+        let fire_position = Vec2::new(2, 2);
+        game.board.place_checker_at(fire_position, Checker::new(1, PLAYER_A_ID)).unwrap();
+        game.apply_move(PLAYER_B_ID, Intent::FireChecker(fire_position));
+        assert_eq!(game.board.checker_at(fire_position).unwrap().owner, EMPTY_PLAYER_ID);
     }
 
     #[test]
     pub fn reset() {
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
+        let mut game = Game::new(&mut player_a, &mut player_b);
 
+        // Place some stones for a, b
+        game.apply_move(PLAYER_A_ID, Intent::PlaceStone(Vec2::new(4, 4)));
+        game.apply_move(PLAYER_B_ID, Intent::PlaceStone(Vec2::new(4, 3)));
+        // Place checkers for a, b
+        game.apply_move(PLAYER_A_ID, Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(7, 0)));
+        game.apply_move(PLAYER_B_ID, Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(0, 0)));
+        // reset
+        game.reset();
+        // Assert that stone_counters reset, stones not on board
+        assert_eq!(game.board.stone_at(Vec2::new(4, 4)).unwrap().owner, EMPTY_PLAYER_ID);
+        assert_eq!(game.board.stone_at(Vec2::new(4, 3)).unwrap().owner, EMPTY_PLAYER_ID);
+        assert_eq!(game.players[0].stones, STARTING_STONES);
+        assert_eq!(game.players[1].stones, STARTING_STONES);
+
+        // Assert that checkers not on board.
+        assert_eq!(game.board.checker_at(Vec2::new(7, 0)).unwrap().owner, EMPTY_PLAYER_ID);
+        assert_eq!(game.board.checker_at(Vec2::new(0, 0)).unwrap().owner, EMPTY_PLAYER_ID);
     }
 
     mod player {
+        use crate::game::PlayerFactory;
+
         #[test]
         pub fn reset() {
-
+            // Number of stones should reset
+            let mut player = PlayerFactory::console_player(2, 5);
+            player.get_stone();
+            player.get_stone();
+            player.reset();
+            assert_eq!(player.stones, 5);
         }
 
         #[test]
         pub fn get_stone() {
-
+            let nstones = 5;
+            let id = 2;
+            let mut player = PlayerFactory::console_player(id, nstones);
+            let mut stone_counter = 0;
+            while let Some(stone) = player.get_stone() {
+                stone_counter += 1;
+                assert_eq!(stone.owner, id);
+            }
+            assert_eq!(player.stones, 0);
+            assert_eq!(stone_counter, nstones);
+            if let Some(_stone) = player.get_stone() {
+                panic!("Expected None, got Some");
+            }
+            assert_eq!(player.stones, 0);
         }
     }
 }
