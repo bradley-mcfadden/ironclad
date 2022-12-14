@@ -3,7 +3,7 @@
  * input, and applies moves to the board.
  */
 
-use std::io;
+use std::io::{self, Write};
 use std::fmt::{
     Display,
     Formatter,
@@ -74,6 +74,7 @@ impl<'a> Game<'a> {
     pub fn play(&mut self) -> i32 {
         loop {
             for p_num in 0..2 {
+                println!("\n{}", self.board);
                 let player_id = self.players[p_num].id;
                 let move_checkers = self.checker_moves_for(player_id);
                 let fire_checkers = self.checker_fires_for(player_id);
@@ -82,6 +83,7 @@ impl<'a> Game<'a> {
                 let chosen_move = self.players[p_num].choose_move(
                     move_checkers, fire_checkers, place_stones, slide_stones
                 );
+                println!("Player {} chose to {}", player_id, chosen_move);
                 self.apply_move(player_id, chosen_move);
                 let win_state = self.check_for_win();
                 if win_state.is_some() {
@@ -452,14 +454,18 @@ impl Decide for ConsolePlayer {
 
         let chosen_move: Option<Intent> = None;
         while let None = chosen_move {
-            print!("What would you like to do?\n");
+            print!("\nWhat would you like to do? (Type your choice, then press ENTER)\n");
             println!("M - Move checker");
             println!("A - Attack checker");
             println!("P - Place stone");
             println!("S - Slide stone");
 
+            print!("Enter a letter: ");
+            io::stdout().flush().unwrap();
             let mut line = String::new();
-            while let Err(_) = io::stdin().read_line(&mut line){}
+            while let Err(_) = io::stdin().read_line(&mut line){
+                print!("Enter a letter: ");
+            }
             
             let choice = line.chars().collect::<Vec<char>>()[0];
             match choice {
@@ -474,6 +480,8 @@ impl Decide for ConsolePlayer {
 
                     let mut line = String::new();
                     loop {
+                        print!("Enter the number of your choice: ");
+                        io::stdout().flush().unwrap();
                         while let Err(_) = io::stdin().read_line(&mut line) {}
                         if let Ok(idx) = line.trim().parse::<usize>() { 
                             if idx < move_checkers.len() {
@@ -494,6 +502,8 @@ impl Decide for ConsolePlayer {
 
                     let mut line = String::new();
                     loop {
+                        print!("Enter the number of your choice: ");
+                        io::stdout().flush().unwrap();
                         while let Err(_) = io::stdin().read_line(&mut line) {}
                         if let Ok(idx) = line.trim().parse::<usize>() { 
                             if idx < fire_checkers.len() {
@@ -514,6 +524,8 @@ impl Decide for ConsolePlayer {
 
                     let mut line = String::new();
                     loop {
+                        print!("Enter the number of your choice: ");
+                        io::stdout().flush().unwrap();
                         while let Err(_) = io::stdin().read_line(&mut line) {}
                         if let Ok(idx) = line.trim().parse::<usize>() { 
                             if idx < place_stones.len() {
@@ -534,6 +546,8 @@ impl Decide for ConsolePlayer {
 
                     let mut line = String::new();
                     loop {
+                        print!("Enter the number of your choice: ");
+                        io::stdout().flush().unwrap();
                         while let Err(_) = io::stdin().read_line(&mut line) {}
                         if let Ok(idx) = line.trim().parse::<usize>() { 
                             if idx < slide_stones.len() {
@@ -541,7 +555,6 @@ impl Decide for ConsolePlayer {
                             }
                         }
                     }
-
                 },
                 _ => {
                     continue;
