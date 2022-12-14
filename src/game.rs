@@ -4,6 +4,10 @@
  */
 
 use std::io;
+use std::fmt::{
+    Display,
+    Formatter,
+};
 use std::vec::Vec;
 
 use crate::vec::Vec2;
@@ -56,6 +60,10 @@ impl<'a> Game<'a> {
         for player in self.players.iter_mut() {
             player.reset();
         }
+        for i in 0..2 {
+            self.last_two_slides_a[i] = None;
+            self.last_two_slides_b[i] = None;
+        } 
     }
 
     /**
@@ -88,7 +96,7 @@ impl<'a> Game<'a> {
      * Determine if the board is in a winning state, returning the winning player or None.
      * @ret - Winning player or none.
      */
-    pub fn check_for_win(&self) -> Option<i32> {
+    pub fn check_for_win(&mut self) -> Option<i32> {
         let checks = [
             self.check_for_checker_win(),
             self.check_for_circularity_win(),
@@ -132,7 +140,7 @@ impl<'a> Game<'a> {
     pub fn checker_fires_for(&self, player: i32) -> Vec<Intent> {
         let other_player = match player {
             PLAYER_A_ID => PLAYER_B_ID,
-            _ => PLAYER_B_ID
+            _ => PLAYER_A_ID
         };
 
         let mut moves: Vec<Intent> = Vec::new();
@@ -194,6 +202,11 @@ impl<'a> Game<'a> {
                     .unwrap();
             },
             Intent::PlaceStone(at) => {
+                match current_player {
+                    PLAYER_A_ID => self.players[0].get_stone(),
+                    PLAYER_B_ID => self.players[1].get_stone(),
+                    _ => None
+                };
                 self.board
                     .place_stone_at(at, Stone::new(current_player))
                     .unwrap();
@@ -203,6 +216,32 @@ impl<'a> Game<'a> {
                     .slide_stone(from, direction)
                     .unwrap();
             }
+        }
+        match current_player {
+            PLAYER_A_ID => {
+                if self.last_two_slides_a.len() == 2 {
+                    self.last_two_slides_a.swap(0, 1);
+                    self.last_two_slides_a[1] = None;
+                }
+                for i in 0..2 {
+                    if let None = self.last_two_slides_a[i] {
+                        self.last_two_slides_a[i] =  Some(intent);
+                    }
+                }
+
+            },
+            PLAYER_B_ID => {
+                if self.last_two_slides_b.len() == 2 {
+                    self.last_two_slides_b.swap(0, 1);
+                    self.last_two_slides_b[1] = None;
+                }
+                for i in 0..2 {
+                    if let None = self.last_two_slides_b[i] {
+                        self.last_two_slides_b[i] =  Some(intent);
+                    }
+                }
+            },
+            _ => ()
         }
     }
 
@@ -251,39 +290,50 @@ impl<'a> Game<'a> {
     fn check_for_checker_win(&self) -> Option<i32> {
         for yi in 0..BOARD_HEIGHT as i32 {
              // check if any player B checkers in column 7
-            let position_b = Vec2::new(BOARD_WIDTH as i32, yi);
-            if self.board.checker_at(position_b).unwrap().owner == PLAYER_B_ID {
-                return Some(PLAYER_B_ID);
+            let position_a = Vec2::new(0, yi);
+            let checker_at_a = self.board.checker_at(position_a).unwrap().owner;
+            if checker_at_a == PLAYER_A_ID {
+                return Some(PLAYER_A_ID);
             }
             // check if any player A checkers are in column 0
-            let position_a = Vec2::new(0, yi);
-            if self.board.checker_at(position_a).unwrap().owner == PLAYER_A_ID {
-                return Some(PLAYER_A_ID);
+            let position_b = Vec2::new(BOARD_WIDTH as i32 - 1, yi);
+            let checker_at_b = self.board.checker_at(position_b).unwrap().owner;
+            if checker_at_b == PLAYER_B_ID {
+                return Some(PLAYER_B_ID);
             }
         }
         None
     }
+
     /*
      * Helper function returning winner if law of circularity (circular slide move)
      * has been violated.
      * Returns reference to winner or none.
      */
-    fn check_for_circularity_win(&self) -> Option<i32> {
+    fn check_for_circularity_win(&mut self) -> Option<i32> {
         if let Some(Intent::SlideStone(from1, dir1)) = self.last_two_slides_a[0] {
             if let Some(Intent::SlideStone(_, dir2)) = self.last_two_slides_a[1] {
-                let mid_position = self.board.slide_stone_result(from1, dir1).unwrap();
-                let end_position = self.board.slide_stone_result(mid_position, dir2).unwrap();
+                let mid_position = self.board.slide_stone(from1, dir1).unwrap();
+                let end_position = self.board.slide_stone(mid_position, dir2).unwrap();
                 if from1 == end_position {
                     return Some(PLAYER_B_ID);
+                }
+                
+                if let Ok(mid_position) = self.board.slide_stone(end_position, dir2.inverse()) {
+                    self.board.slide_stone(mid_position, dir1.inverse()).unwrap();
                 }
             }
         }
         if let Some(Intent::SlideStone(from1, dir1)) = self.last_two_slides_b[0] {
             if let Some(Intent::SlideStone(_, dir2)) = self.last_two_slides_b[1] {
-                let mid_position = self.board.slide_stone_result(from1, dir1).unwrap();
-                let end_position = self.board.slide_stone_result(mid_position, dir2).unwrap();
+                let mid_position = self.board.slide_stone(from1, dir1).unwrap();
+                let end_position = self.board.slide_stone(mid_position, dir2).unwrap();
                 if from1 == end_position {
                     return Some(PLAYER_A_ID);
+                }
+
+                if let Ok(mid_position) = self.board.slide_stone(end_position, dir2.inverse()) {
+                    self.board.slide_stone(mid_position, dir1.inverse()).unwrap();
                 }
             }
         }
@@ -298,7 +348,7 @@ impl<'a> Game<'a> {
         let mut empty_neighbours: Vec<Vec2> = Vec::new();
         for npos in Board::checker_neighbours(pos).iter() {
             if self.board.checker_at(*npos).unwrap().owner == EMPTY_PLAYER_ID {
-                empty_neighbours.push(pos);
+                empty_neighbours.push(*npos);
             }
         }
         empty_neighbours
@@ -332,7 +382,7 @@ impl<'a> Game<'a> {
         for pos in self.board.empty_stones().iter() {
             let mut is_valid = true;
             for cpos in Board::checker_neigbours_of_stone(*pos).iter() {
-                if self.board.stone_at(*cpos).unwrap().owner != EMPTY_PLAYER_ID {
+                if self.board.checker_at(*cpos).unwrap().owner != EMPTY_PLAYER_ID {
                     is_valid = false;
                     break;
                 }
@@ -358,6 +408,17 @@ pub enum Intent {
     FireChecker(Vec2),
     PlaceStone(Vec2),
     SlideStone(Vec2, Direction)
+}
+
+impl Display for Intent {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Intent::MoveChecker(from, to) => write!(formatter, "MoveChecker from {} to {}", from, to),
+            Intent::FireChecker(at) => write!(formatter, "FireChecker at {}", at),
+            Intent::PlaceStone(at) => write!(formatter, "PlaceStone at {}", at),
+            Intent::SlideStone(from, direction) => write!(formatter, "SlideStone from {} toward {}", from, direction)
+        }
+    }
 }
 
 pub trait Decide {
@@ -613,16 +674,17 @@ mod test {
 
         game.reset();
         game.apply_move(PLAYER_A_ID, Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(7, 0)));
-        for xi in (1..7).rev() {
+        for xi in (1..=7).rev() {
             let from_position = Vec2::new(xi, 0);
             let to_position = Vec2::new(xi - 1, 0);
             game.apply_move(PLAYER_A_ID, Intent::MoveChecker(from_position, to_position));
         }
+
         assert_eq!(game.check_for_win(), Some(PLAYER_A_ID));
 
         game.reset();
         game.apply_move(PLAYER_B_ID, Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(0, 0)));
-        for xi in 0..6 {
+        for xi in 0..=6 {
             let from_position = Vec2::new(xi, 0);
             let to_position = Vec2::new(xi + 1, 0);
             game.apply_move(PLAYER_B_ID, Intent::MoveChecker(from_position, to_position));
@@ -654,24 +716,39 @@ mod test {
         {
             let expected_a_moves = vec![
                 Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(7, 0)), Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(6, 1)),
-                Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(7, 5)), Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(6, 4)),
+                Intent::MoveChecker(Vec2::new(7, 1), Vec2::new(6, 0)), Intent::MoveChecker(Vec2::new(7, 2), Vec2::new(6, 1)),
+                Intent::MoveChecker(Vec2::new(7, 3), Vec2::new(6, 4)), Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(7, 5)), 
+                Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(6, 4)), Intent::MoveChecker(Vec2::new(7, 4), Vec2::new(6, 5)),
                 Intent::MoveChecker(Vec2::new(6, 2), Vec2::new(6, 1)), Intent::MoveChecker(Vec2::new(6, 2), Vec2::new(5, 2)),
-                Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(6, 4)), Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(5, 2))
+                Intent::MoveChecker(Vec2::new(6, 2), Vec2::new(5, 1)), Intent::MoveChecker(Vec2::new(6, 2), Vec2::new(5, 3)),
+                Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(6, 4)), Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(5, 2)),
+                Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(5, 4)), Intent::MoveChecker(Vec2::new(6, 3), Vec2::new(5, 3)),
             ];
             let actual_a_moves = game.checker_moves_for(PLAYER_A_ID);
+
+            for move_a in actual_a_moves.iter() {
+                println!("{move_a}");
+            }
+            
             for move_a in expected_a_moves.iter() {
+                // println!("{move_a}");
                 assert!(actual_a_moves.contains(&move_a));
             }
         }
         {
             let expected_b_moves = vec![
                 Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(0, 0)), Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(1, 1)),
-                Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(0, 5)), Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(1, 4)),
+                Intent::MoveChecker(Vec2::new(0, 1), Vec2::new(1, 0)), Intent::MoveChecker(Vec2::new(0, 2), Vec2::new(1, 1)),
+                Intent::MoveChecker(Vec2::new(0, 3), Vec2::new(1, 4)), Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(0, 5)), 
+                Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(1, 4)), Intent::MoveChecker(Vec2::new(0, 4), Vec2::new(1, 5)),
                 Intent::MoveChecker(Vec2::new(1, 2), Vec2::new(1, 1)), Intent::MoveChecker(Vec2::new(1, 2), Vec2::new(2, 2)),
-                Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(1, 4)), Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(2, 3))
+                Intent::MoveChecker(Vec2::new(1, 2), Vec2::new(2, 1)), Intent::MoveChecker(Vec2::new(1, 2), Vec2::new(2, 3)),
+                Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(1, 4)), Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(2, 3)),
+                Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(2, 4)), Intent::MoveChecker(Vec2::new(1, 3), Vec2::new(2, 2)),
             ];
             let actual_b_moves = game.checker_moves_for(PLAYER_B_ID);
             for move_b in expected_b_moves.iter() {
+                println!("{move_b}");
                 assert!(actual_b_moves.contains(&move_b));
             }
         }
@@ -679,7 +756,47 @@ mod test {
 
     #[test]
     pub fn checker_fires_for()  {
-        panic!()
+        let mut player_a = PlayerFactory::console_player(PLAYER_A_ID, STARTING_STONES);
+        let mut player_b = PlayerFactory::console_player(PLAYER_B_ID, STARTING_STONES);
+        let mut game = Game::new(&mut player_a, &mut player_b);
+
+        {
+            let fireable_positions = vec![Vec2::new(5, 2), Vec2::new(5, 3), Vec2::new(5, 5)];
+            for pos in fireable_positions.iter() {
+                game.board.place_checker_at(*pos, Checker::new(1, PLAYER_B_ID)).unwrap();
+            }
+
+            let expected = fireable_positions.iter().map(|pos| Intent::FireChecker(*pos)).collect::<Vec<Intent>>();
+            let actual = game.checker_fires_for(PLAYER_A_ID);
+
+            println!("Actual moves for Player A:");
+            for move_a in actual.iter() {
+                println!("{move_a}");
+            }
+            
+            for move_a in expected.iter() {
+                assert!(actual.contains(move_a)); 
+            }
+        }
+        game.reset();
+        {
+            let fireable_positions = vec![Vec2::new(3, 2), Vec2::new(3, 3), Vec2::new(3, 5)];
+            for pos in fireable_positions.iter() {
+                game.board.place_checker_at(*pos, Checker::new(1, PLAYER_A_ID)).unwrap();
+            }
+
+            let expected = fireable_positions.iter().map(|pos| Intent::FireChecker(*pos)).collect::<Vec<Intent>>();
+            let actual = game.checker_fires_for(PLAYER_B_ID);
+            
+            println!("Actual moves for Player B:");
+            for move_b in actual.iter() {
+                println!("{move_b}");
+            }
+
+            for move_b in expected.iter() {
+                assert!(actual.contains(move_b)); 
+            }
+        }
     }
 
     #[test]
@@ -689,7 +806,8 @@ mod test {
         let game = Game::new(&mut player_a, &mut player_b);
         
         for player in vec![PLAYER_A_ID, PLAYER_B_ID] {
-            assert_eq!(game.stone_places_for(player).len(), 33);
+            // The expected number is 37, because the 6 checkers on each side border 2*13 unique squares, and 63 - 26 = 37
+            assert_eq!(game.stone_places_for(player).len(), 37);
         }
     }
     
@@ -703,10 +821,12 @@ mod test {
         game.apply_move(PLAYER_A_ID, Intent::PlaceStone(stone_location));
 
         let expected = vec![
-            Intent::SlideStone(stone_location, Direction::Up), Intent::SlideStone(stone_location, Direction::Down),
-            Intent::SlideStone(stone_location, Direction::Right), Intent::SlideStone(stone_location, Direction::Left)    
+            Intent::SlideStone(stone_location, Direction::Down), Intent::SlideStone(stone_location, Direction::Right),    
         ];
         let actual = game.stone_slides_for(PLAYER_A_ID);
+        for move_actual in actual.iter() {
+            println!("{move_actual}");
+        }
         for stone_slide in expected.iter() {
             assert!(actual.contains(stone_slide));
         }
@@ -720,11 +840,13 @@ mod test {
         // Moving a checker
         let mut game = Game::new(&mut player_a, &mut player_b);
 
-        let from_position = Vec2::new(6, 1);
-        let to_position = Vec2::new(6, 0);
+        let from_position = Vec2::new(7, 1);
+        let to_position = Vec2::new(7, 0);
         
+        println!("{}", &game.board);
         game.apply_move(PLAYER_A_ID, Intent::MoveChecker(from_position, to_position)); 
-        
+        println!("{}", &game.board);
+
         assert_eq!(game.board.checker_at(to_position).unwrap().owner, PLAYER_A_ID);
         assert_eq!(game.board.checker_at(from_position).unwrap().owner, EMPTY_PLAYER_ID);
         
@@ -770,6 +892,12 @@ mod test {
         // Assert that checkers not on board.
         assert_eq!(game.board.checker_at(Vec2::new(7, 0)).unwrap().owner, EMPTY_PLAYER_ID);
         assert_eq!(game.board.checker_at(Vec2::new(0, 0)).unwrap().owner, EMPTY_PLAYER_ID);
+
+        // Assert that last moves are empty
+        for i in 0..2 {
+            assert_eq!(game.last_two_slides_a[i], None);
+            assert_eq!(game.last_two_slides_b[i], None);
+        }
     }
 
     mod player {

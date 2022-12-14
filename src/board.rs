@@ -2,8 +2,8 @@
  * Stores board and related classes that track the state of the board,
  * and can answer questions about it.
  */
-use std::fmt::{Display, Error, Formatter};
-use std::vec::{Vec};
+use std::fmt::{Debug, Display, Error, Formatter};
+use std::vec::Vec;
 
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
@@ -76,6 +76,15 @@ impl Direction {
             Direction::Down => crate::vec::DOWN,
             Direction::Left => crate::vec::LEFT,
             Direction::Right => crate::vec::RIGHT
+        }
+    }
+
+    pub fn inverse(&self) -> Direction {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
         }
     }
 }
@@ -186,7 +195,7 @@ impl Board {
      * @dir Direction to move stone in.
      * @ret Ok if slide is legal, or SlideError if something went wrong.
      */
-    pub fn slide_stone(&mut self, from: Vec2, dir: Direction) -> Result<(), SlideError> {
+    pub fn slide_stone(&mut self, from: Vec2, dir: Direction) -> Result<Vec2, SlideError> {
         if !Board::is_stone_vec_valid(from) {
             return Err(SlideError::IndexError)
         }
@@ -214,7 +223,7 @@ impl Board {
         let old_idx  = Board::vec_to_stone_idx(from);
         self.stone_board.swap(new_idx, old_idx);
 
-        Ok(())
+        Ok(last_free_position)
     }
 
     /**
@@ -679,6 +688,12 @@ impl Board {
 
 impl Display for Board {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), std::fmt::Error> { 
+        write!(fmt, "{}", self.as_string())
+    }
+}
+
+impl Debug for Board {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(fmt, "{}", self.as_string())
     }
 }
